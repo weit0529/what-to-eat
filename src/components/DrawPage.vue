@@ -1,16 +1,21 @@
 <!--
-  随机抽取页面：选餐次 → （可选）排除不想吃的 → 抽 → 看结果 → 不满意再抽。
+  主页面：选餐次 → 切换“随机抽 / 帮我分析” → （可选）排除不想吃的 → 抽或推荐。
+  两种模式共用餐次和“不想吃的”（用户 2026-11-05 决定 1A）。
+  随机模式里还有临时小名单（5A）：打开开关后只在名单里抽，不受餐次和“不想吃的”限制。
   所有选择只存在页面里，刷新就恢复原样（需求 R-006）。
-  抽取逻辑都在 src/core/draw.js，这里只负责界面和状态。
+  抽取逻辑在 src/core/draw.js，推荐逻辑在 src/core/recommend.js，这里只负责界面和状态。
 -->
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { MEALS } from '../core/menu-data.js'
 import { itemsForMeal, getCandidates, emptyReason, drawOne } from '../core/draw.js'
+import { shortlistItems } from '../core/recommend.js'
 import MealPicker from './MealPicker.vue'
 import ExcludePanel from './ExcludePanel.vue'
 import ResultCard from './ResultCard.vue'
 import Mascot from './Mascot.vue'
+import ShortlistPanel from './ShortlistPanel.vue'
+import AnalyzePanel from './AnalyzePanel.vue'
 
 const props = defineProps({
   /** 全部菜品（menu.json 的 items） */
@@ -23,6 +28,9 @@ const props = defineProps({
 
 // ---- 页面状态 ----
 const meal = ref(null) // 选中的餐次，没选是 null
+const mode = ref('random') // 'random' 随机抽 / 'analyze' 帮我分析
+const shortlist = ref([]) // 小名单（菜品 id）
+const shortlistOn = ref(false) // 随机模式是否只在小名单里抽
 const excludedCategories = ref([]) // 这次不想吃的分类
 const excludedIds = ref([]) // 这次不想吃的菜
 const result = ref(null) // 抽中的菜
@@ -37,8 +45,18 @@ const choice = computed(() => ({
   excludedCategories: excludedCategories.value,
   excludedIds: excludedIds.value,
 }))
-const candidates = computed(() => (meal.value ? getCandidates(props.items, choice.value) : []))
-const empty = computed(() => (meal.value ? emptyReason(props.items, choice.value) : null))
+const candidates = computed(() => {
+  if (!meal.value) return []
+  // 小名单开着时，只在名单里抽，不管餐次和“不想吃的”
+  if (shortlistOn.value) return shortlistItems(props.items, shortlist.value)
+  return getCandidates(props.items, choice.value)
+})
+const empty = computed(() => {
+  if (!meal.value) return null
+  if (shortlistOn.value) return candidates.value.length === 0 ? 'shortlist-empty' : null
+  return emptyReason(props.items, choice.value)
+})
+const showExclude = computed(() => mealItems.value.length > 0 && !(mode.value === 'random' && shortlistOn.value))
 const mealLabel = computed(() => MEALS.find((m) => m.id === meal.value)?.label ?? '')
 
 /** 吉祥物的表情：抽取中抖得欢，抽中了蹦一下，平时轻轻跳 */
@@ -51,8 +69,9 @@ watch(meal, () => {
   cancelled.value = false
 })
 
-// 动画期间改了“不想吃的”：取消这次抽取，请用户重新点（结果是动画开始前定的，可能已经被排除）
-watch([excludedCategories, excludedIds], () => {
+// 动画期间改了“不想吃的”、小名单或开关、或者切到别的模式：取消这次抽取，请用户重新点
+// （结果是动画开始前定的，可能已经不在候选里了）
+watch([excludedCategories, excludedIds, shortlist, shortlistOn, mode], () => {
   if (!rolling.value) return
   stopRolling()
   cancelled.value = true
@@ -116,55 +135,131 @@ function draw() {
     <p v-if="!meal" class="prompt"><span class="point" aria-hidden="true">👆</span> 先选这是哪一餐</p>
 
     <template v-else>
+      <div class="mode-tabs" role="group" aria-label="选择模式">
+        <button
+          type="button"
+          class="mode-tab"
+          :class="{ active: mode === 'random' }"
+          :aria-pressed="mode === 'random'"
+          data-mode="random"
+          @click="mode = 'random'"
+        >
+          <span aria-hidden="true">🎲 </span>随机抽
+        </button>
+        <button
+          type="button"
+          class="mode-tab"
+          :class="{ active: mode === 'analyze' }"
+          :aria-pressed="mode === 'analyze'"
+          data-mode="analyze"
+          @click="mode = 'analyze'"
+        >
+          <span aria-hidden="true">🔍 </span>帮我分析
+        </button>
+      </div>
+
       <ExcludePanel
-        v-if="mealItems.length > 0"
+        v-if="showExclude"
         v-model:excluded-categories="excludedCategories"
         v-model:excluded-ids="excludedIds"
         :items="mealItems"
       />
 
-      <div class="action">
-        <div class="button-row">
-          <!-- key 跟着状态变，换表情时重新播放动画 -->
-          <Mascot :key="`l-${mascotMood}-${result?.id}`" :mood="mascotMood" />
-          <button
-            type="button"
-            class="draw-button"
-            :disabled="candidates.length === 0 || rolling"
-            @click="draw"
-          >
-            <span class="btn-emoji" aria-hidden="true">{{ result ? '🔄' : '🎲' }}</span>
-            <span class="btn-label">{{ result ? '再抽一次' : '帮我选！' }}</span>
-          </button>
-          <Mascot :key="`r-${mascotMood}-${result?.id}`" :mood="mascotMood" flip />
-        </div>
-        <p v-if="candidates.length > 0" class="candidate-count">{{ mealLabel }}有 {{ candidates.length }} 道可选</p>
-      </div>
+      <AnalyzePanel
+        v-if="mode === 'analyze'"
+        v-model:shortlist="shortlist"
+        :items="items"
+        :meal="meal"
+        :excluded-categories="excludedCategories"
+        :excluded-ids="excludedIds"
+        :random="random"
+      />
 
-      <div class="outcome" aria-live="polite">
-        <p v-if="empty === 'no-items-for-meal'" class="empty">
-          <span class="empty-emoji" aria-hidden="true">🫙</span>
-          菜单里还没有适合{{ mealLabel }}的菜。可以在菜单表格的“适合餐次”里加上“{{ mealLabel }}”。
-        </p>
-        <p v-else-if="empty === 'all-excluded'" class="empty">
-          <span class="empty-emoji" aria-hidden="true">🙈</span>
-          能选的都被排除了，在上面点“全部恢复”或者少排除几个试试。
-        </p>
-        <div v-else-if="rolling" class="rolling" aria-hidden="true">
-          <span class="slot">🎰</span>
-          <span class="rolling-name">{{ rollingName }}</span>
+      <template v-else>
+        <ShortlistPanel
+          v-model:shortlist="shortlist"
+          v-model:enabled="shortlistOn"
+          :items="items"
+          :meal-items="mealItems"
+        />
+
+        <div class="action">
+          <div class="button-row">
+            <!-- key 跟着状态变，换表情时重新播放动画 -->
+            <Mascot :key="`l-${mascotMood}-${result?.id}`" :mood="mascotMood" />
+            <button
+              type="button"
+              class="draw-button"
+              :disabled="candidates.length === 0 || rolling"
+              @click="draw"
+            >
+              <span class="btn-emoji" aria-hidden="true">{{ result ? '🔄' : '🎲' }}</span>
+              <span class="btn-label">{{ result ? '再抽一次' : '帮我选！' }}</span>
+            </button>
+            <Mascot :key="`r-${mascotMood}-${result?.id}`" :mood="mascotMood" flip />
+          </div>
+          <p v-if="candidates.length > 0" class="candidate-count">
+            {{ shortlistOn ? `小名单里有 ${candidates.length} 道` : `${mealLabel}有 ${candidates.length} 道可选` }}
+          </p>
         </div>
-        <p v-else-if="cancelled" class="empty">
-          <span class="empty-emoji" aria-hidden="true">🫣</span>
-          改了不想吃的，这次没抽完。再点一次“帮我选！”吧
-        </p>
-        <ResultCard v-else-if="result" :key="result.id" :item="result" />
-      </div>
+
+        <div class="outcome" aria-live="polite">
+          <p v-if="empty === 'no-items-for-meal'" class="empty">
+            <span class="empty-emoji" aria-hidden="true">🫙</span>
+            菜单里还没有适合{{ mealLabel }}的菜。可以在菜单表格的“适合餐次”里加上“{{ mealLabel }}”。
+          </p>
+          <p v-else-if="empty === 'all-excluded'" class="empty">
+            <span class="empty-emoji" aria-hidden="true">🙈</span>
+            能选的都被排除了，在上面点“全部恢复”或者少排除几个试试。
+          </p>
+          <p v-else-if="empty === 'shortlist-empty'" class="empty">
+            <span class="empty-emoji" aria-hidden="true">📝</span>
+            小名单还是空的，先往里加几道菜吧。
+          </p>
+          <div v-else-if="rolling" class="rolling" aria-hidden="true">
+            <span class="slot">🎰</span>
+            <span class="rolling-name">{{ rollingName }}</span>
+          </div>
+          <p v-else-if="cancelled" class="empty">
+            <span class="empty-emoji" aria-hidden="true">🫣</span>
+            改了条件，这次没抽完。再点一次“帮我选！”吧
+          </p>
+          <ResultCard v-else-if="result" :key="result.id" :item="result" />
+        </div>
+      </template>
     </template>
   </div>
 </template>
 
 <style scoped>
+.mode-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 18px;
+  padding: 5px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+}
+
+.mode-tab {
+  min-height: 42px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  transition: background 0.15s;
+}
+
+.mode-tab.active {
+  background: var(--surface);
+  color: var(--accent-dark);
+  box-shadow: 0 3px 0 var(--border);
+}
+
 .prompt {
   margin: 30px 0 0;
   text-align: center;

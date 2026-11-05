@@ -8,6 +8,8 @@ import { emojiForCategory } from '../ui/food-emoji.js'
 
 const props = defineProps({
   item: { type: Object, required: true },
+  /** 卡片顶部横幅上的字 */
+  ribbon: { type: String, default: '就吃它！' },
 })
 
 /** 图片加载失败（比如文件坏了）时就不显示图片，改显示 emoji */
@@ -39,7 +41,7 @@ const priceText = computed(() => {
 
 <template>
   <article class="result-card">
-    <p class="ribbon"><span aria-hidden="true">🎉 </span>就吃它！<span aria-hidden="true"> 🎉</span></p>
+    <p class="ribbon"><span aria-hidden="true">🎉 </span>{{ ribbon }}<span aria-hidden="true"> 🎉</span></p>
     <img
       v-if="imageUrl && !imageFailed"
       class="photo"
@@ -57,6 +59,7 @@ const priceText = computed(() => {
         <li v-for="tag in item.tags" :key="tag">{{ tag }}</li>
       </ul>
       <p v-if="item.description" class="description">{{ item.description }}</p>
+      <slot />
     </div>
   </article>
 </template>
