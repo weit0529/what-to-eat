@@ -250,9 +250,6 @@ const mascotMood = computed(() => (result.value?.status === 'ok' ? 'cheer' : 'ha
               </li>
             </ul>
           </div>
-          <p v-if="shortlist.length > 0" class="hint">
-            小名单里有 {{ shortlist.length }} 道。到上面“随机抽”打开“只在小名单里抽”，就能从里面抽。
-          </p>
         </template>
       </template>
     </div>

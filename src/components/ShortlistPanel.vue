@@ -81,7 +81,7 @@ function clearAll() {
       </button>
     </div>
 
-    <p class="hint small">小名单不管餐次和“不想吃的”，刷新页面就清空。</p>
+    <p class="hint small">加了第一道菜就会自动打开开关，清空后自动关掉。小名单不管餐次和“不想吃的”，刷新页面就清空。</p>
   </section>
 </template>
 

@@ -360,3 +360,65 @@ describe('小名单（B-04）', () => {
     expect(fresh.findAll('.shortlist-panel .chips li')).toHaveLength(0)
   })
 })
+
+// 用户 2026-11-05 11:56 的修改：加第一道菜自动启用小名单；分析页下方气泡“去随机抽食物”
+describe('小名单自动启用和“去随机抽”气泡', () => {
+  async function addFromAnalyze(w) {
+    await click(recommendButton(w))
+    await click(w.find('.shortlist-button'))
+  }
+
+  it('分析页里还没加菜时没有气泡；加了第一道就出现，写着几道', async () => {
+    const w = await openAnalyze()
+    expect(w.find('.shortlist-bubble').exists()).toBe(false)
+    await addFromAnalyze(w)
+    const bubble = w.find('.shortlist-bubble')
+    expect(bubble.text()).toContain('选好小名单了，去随机抽食物')
+    expect(bubble.find('.bubble-badge').text()).toBe('1 道')
+    await click(w.findAll('.alt-add')[0])
+    expect(w.find('.shortlist-bubble .bubble-badge').text()).toBe('2 道')
+  })
+
+  it('点气泡：跳到随机抽，开关已打开，只在小名单里抽', async () => {
+    const w = await openAnalyze('午餐', { random: Math.random })
+    await addFromAnalyze(w)
+    const picked = pickName(w)
+    await click(w.find('.shortlist-bubble'))
+    expect(modeTab(w, 'random').attributes('aria-pressed')).toBe('true')
+    expect(w.find('.switch-input').element.checked).toBe(true)
+    expect(w.find('.candidate-count').text()).toBe('小名单里有 1 道')
+    expect(w.find('.shortlist-bubble').exists()).toBe(false) // 随机抽页面不显示气泡
+    await click(w.find('.draw-button'))
+    expect(w.find('.result-card .name').text()).toBe(picked)
+  })
+
+  it('在随机抽页面挑第一道菜，也自动打开开关', async () => {
+    const w = mountPage()
+    await click(mealButton(w, '午餐'))
+    expect(w.find('.switch-input').element.checked).toBe(false)
+    await click(w.find('.picker-toggle'))
+    await click(w.findAll('.pick').find((b) => b.text().includes('寿司')))
+    expect(w.find('.switch-input').element.checked).toBe(true)
+    expect(w.find('.candidate-count').text()).toBe('小名单里有 1 道')
+  })
+
+  it('手动关掉开关后再加菜，不会又被自动打开（只在从空变成有菜时自动打开）', async () => {
+    const w = mountPage()
+    await click(mealButton(w, '午餐'))
+    await click(w.find('.picker-toggle'))
+    await click(w.findAll('.pick').find((b) => b.text().includes('寿司')))
+    await w.find('.switch-input').setValue(false)
+    await click(w.findAll('.pick').find((b) => b.text().includes('馄饨')))
+    expect(w.find('.switch-input').element.checked).toBe(false)
+  })
+
+  it('清空小名单：开关自动关掉，气泡消失', async () => {
+    const w = await openAnalyze()
+    await addFromAnalyze(w)
+    await click(w.find('.shortlist-button')) // 再点一下移出
+    expect(w.find('.shortlist-bubble').exists()).toBe(false)
+    await click(modeTab(w, 'random'))
+    expect(w.find('.switch-input').element.checked).toBe(false)
+    expect(w.find('.candidate-count').text()).toBe('午餐有 4 道可选')
+  })
+})

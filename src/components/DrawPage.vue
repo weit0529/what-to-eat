@@ -2,11 +2,13 @@
   主页面：选餐次 → 切换“随机抽 / 帮我分析” → （可选）排除不想吃的 → 抽或推荐。
   两种模式共用餐次和“不想吃的”（用户 2026-11-05 决定 1A）。
   随机模式里还有临时小名单（5A）：打开开关后只在名单里抽，不受餐次和“不想吃的”限制。
+  往小名单里加第一道菜时自动打开开关，清空时自动关掉；在“帮我分析”页面下方
+  显示气泡“选好小名单了，去随机抽食物”，点一下跳到随机抽（用户 2026-11-05 11:56 要求）。
   所有选择只存在页面里，刷新就恢复原样（需求 R-006）。
   抽取逻辑在 src/core/draw.js，推荐逻辑在 src/core/recommend.js，这里只负责界面和状态。
 -->
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { MEALS } from '../core/menu-data.js'
 import { itemsForMeal, getCandidates, emptyReason, drawOne } from '../core/draw.js'
 import { shortlistItems } from '../core/recommend.js'
@@ -77,6 +79,25 @@ watch([excludedCategories, excludedIds, shortlist, shortlistOn, mode], () => {
   cancelled.value = true
 })
 
+// 小名单从空变成有菜：自动打开“只在小名单里抽”；清空了就自动关掉
+watch(shortlist, (list, old) => {
+  if (old.length === 0 && list.length > 0) shortlistOn.value = true
+  if (list.length === 0) shortlistOn.value = false
+})
+
+/** 是否显示“去随机抽”气泡：在“帮我分析”页面、小名单里有菜时 */
+const showBubble = computed(() => meal.value !== null && mode.value === 'analyze' && shortlist.value.length > 0)
+
+/** 点气泡：切到随机抽，打开小名单开关，滚到抽取按钮 */
+async function goDrawFromShortlist() {
+  mode.value = 'random'
+  shortlistOn.value = true
+  await nextTick()
+  const button = document.querySelector('.draw-button')
+  button?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+  button?.focus?.({ preventScroll: true })
+}
+
 // 排除了当前结果所在的分类或这道菜时，结果也清掉，免得显示一道“不想吃”的菜
 watch(candidates, (list) => {
   if (result.value && !list.some((item) => item.id === result.value.id)) result.value = null
@@ -129,7 +150,7 @@ function draw() {
 </script>
 
 <template>
-  <div class="draw-page">
+  <div class="draw-page" :class="{ 'has-bubble': showBubble }">
     <MealPicker v-model="meal" :items="items" />
 
     <p v-if="!meal" class="prompt"><span class="point" aria-hidden="true">👆</span> 先选这是哪一餐</p>
@@ -228,10 +249,96 @@ function draw() {
         </div>
       </template>
     </template>
+
+    <!-- 小名单气泡：固定在屏幕下方 -->
+    <button v-if="showBubble" type="button" class="shortlist-bubble" @click="goDrawFromShortlist">
+      <span aria-hidden="true">📝 </span>选好小名单了，去随机抽食物<span class="bubble-arrow" aria-hidden="true"> 👉</span>
+      <!-- 右上角的小圆点：小名单里有几道 -->
+      <span class="bubble-badge">{{ shortlist.length }}<span class="sr-only"> 道</span></span>
+    </button>
   </div>
 </template>
 
 <style scoped>
+.has-bubble {
+  /* 给底部的气泡留出位置，免得挡住最后的内容 */
+  padding-bottom: 72px;
+}
+
+.shortlist-bubble {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 10;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 11px 16px;
+  border: 3px solid #1f9e86;
+  border-radius: 999px;
+  background: var(--mint);
+  color: var(--text);
+  font-size: 0.98rem;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(31, 158, 134, 0.35);
+  transform: translateX(-50%);
+  animation: bubble-in 0.35s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+.shortlist-bubble:active {
+  transform: translateX(-50%) scale(0.96);
+}
+
+.bubble-badge {
+  position: absolute;
+  top: -10px;
+  right: -6px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border: 2px solid var(--surface);
+  border-radius: 999px;
+  background: var(--pink);
+  color: var(--text);
+  font-size: 0.8rem;
+  line-height: 20px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* 很窄的手机上字小一点，保证一行放得下 */
+@media (max-width: 360px) {
+  .shortlist-bubble {
+    padding: 10px 12px;
+    font-size: 0.88rem;
+  }
+}
+
+.bubble-arrow {
+  display: inline-block;
+  animation: nudge 1s ease-in-out infinite;
+}
+
+@keyframes bubble-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 30px) scale(0.8);
+  }
+}
+
+@keyframes nudge {
+  50% {
+    transform: translateX(4px);
+  }
+}
+
 .mode-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
