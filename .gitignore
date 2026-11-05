@@ -1,0 +1,25 @@
+# 项目管理文档和审核报告只留在本机，不上传公开仓库（用户 2026-11-05 决定）
+/PROJECT.md
+/REQUIREMENTS.md
+/TECH_STACK.md
+/reviews/
+
+# 依赖（用 npm install 重新生成，不上传）
+node_modules/
+
+# 构建产物（GitHub Actions 会重新构建）
+dist/
+coverage/
+
+# Excel 打开文件时生成的临时锁文件
+~$*
+
+# 日志和系统文件
+*.log
+.DS_Store
+Thumbs.db
+
+# 本机编辑器和工具配置
+.vscode/
+.idea/
+.claude/

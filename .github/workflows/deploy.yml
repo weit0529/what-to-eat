@@ -1,0 +1,56 @@
+# 推送到 main 分支后：安装依赖 → 跑测试 → 构建 → 发布到 GitHub Pages。
+# 测试不通过就不会发布。
+# 首次使用前，要在 GitHub 仓库 Settings → Pages 里把 Source 设为 “GitHub Actions”。
+name: 发布到 GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  # 允许在 GitHub 网页上手动点按钮重新发布
+  workflow_dispatch:
+
+# 默认只给读代码的权限；发布到 Pages 需要的权限只在 deploy 这一步单独给
+permissions:
+  contents: read
+
+# 同一时间只跑一次发布；新的推送会排队，不会打断正在进行的发布
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      # 按 package-lock.json 安装，保证和本机版本一致
+      - run: npm ci
+
+      - run: npm test
+
+      - run: npm run build
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

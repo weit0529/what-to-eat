@@ -1,0 +1,10 @@
+# 文本文件在仓库里统一用 LF 换行，避免 Windows 和 GitHub 之间来回改换行符
+* text=auto eol=lf
+
+# 二进制文件不做换行转换
+*.xlsx binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
