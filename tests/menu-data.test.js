@@ -243,3 +243,48 @@ describe('formatIssue', () => {
     expect(formatIssue({ row: 1, message: '表格里还没有菜' })).toBe('第 1 行：表格里还没有菜')
   })
 })
+
+// docs/菜单填写说明.md 里写给用户的规则，逐条和实际检查对上（M4）
+describe('填写说明里的规则', () => {
+  it('适合餐次认得的词：早餐、早饭、早；午餐、午饭、午；晚餐、晚饭、晚；全天', () => {
+    for (const [text, meals] of [
+      ['早餐', ['breakfast']],
+      ['早饭', ['breakfast']],
+      ['早', ['breakfast']],
+      ['午餐', ['lunch']],
+      ['午饭', ['lunch']],
+      ['午', ['lunch']],
+      ['晚餐', ['dinner']],
+      ['晚饭', ['dinner']],
+      ['晚', ['dinner']],
+      ['全天', ['breakfast', 'lunch', 'dinner']],
+    ]) {
+      expect(parse({ ...OK, 适合餐次: text }).items[0].meals, text).toEqual(meals)
+    }
+    for (const text of ['宵夜', '下午茶']) expect(parse({ ...OK, 适合餐次: text }).errors, text).toHaveLength(1)
+  })
+
+  it('隔开用顿号、中英文逗号、中英文分号或换行', () => {
+    const { items } = parse({ ...OK, 标签: '辣、热乎，汤,快；夜宵;适合下雨\n适合多人' })
+    expect(items[0].tags).toEqual(['辣', '热乎', '汤', '快', '夜宵', '适合下雨', '适合多人'])
+    expect(parse({ ...OK, 适合餐次: '早餐；午餐\n晚餐' }).items[0].meals).toEqual(['breakfast', 'lunch', 'dinner'])
+  })
+
+  it('启用认得的词：是/否、yes/no、1/0、TRUE/FALSE', () => {
+    for (const yes of ['是', 'yes', 'YES', '1', true]) expect(parse({ ...OK, 启用: yes }).items, String(yes)).toHaveLength(1)
+    for (const no of ['否', 'no', '0', false]) expect(parse({ ...OK, 启用: no }, { ...OK, 品类: '别的' }).disabledCount, String(no)).toBe(1)
+  })
+
+  it('人均价格：25、12.5 可以；25元、约25、负数报错', () => {
+    expect(parse({ ...OK, 人均价格: 25 }).items[0].price).toBe(25)
+    expect(parse({ ...OK, 人均价格: '12.5' }).items[0].price).toBe(12.5)
+    for (const bad of ['25元', '约25', -3, '-3']) expect(parse({ ...OK, 人均价格: bad }).errors, String(bad)).toHaveLength(1)
+  })
+
+  it('图片格式：jpg、jpeg、png、webp、gif', () => {
+    for (const name of ['a.jpg', 'a.jpeg', 'a.png', 'a.webp', 'a.gif', 'A.JPG']) {
+      expect(parseMenuRows([HEADER, row({ ...OK, 图片: name })], { imageFiles: [name] }).items[0].image, name).toBe(name)
+    }
+    expect(parseMenuRows([HEADER, row({ ...OK, 图片: 'a.bmp' })], { imageFiles: ['a.bmp'] }).items[0].image).toBeNull()
+  })
+})
