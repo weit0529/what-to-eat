@@ -8,7 +8,10 @@
     "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
   },
   "scripts": {
+    "menu": "node scripts/build-menu.js",
+    "predev": "npm run menu",
     "dev": "vite",
+    "prebuild": "npm run menu",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
