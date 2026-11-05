@@ -1,4 +1,26 @@
-/* 全站通用样式 */
+/* 全站通用样式。界面只用浅色（用户 2026-11-05 要求），颜色都定义成变量，改配色只改这里 */
+
+:root {
+  --bg: #fff7ec;
+  --bg-dot: #ffe8cc;
+  --surface: #ffffff;
+  --text: #3b2a1a;
+  --text-muted: #8a7462;
+  --border: #f3dcc2;
+  --accent: #ff7a1a;
+  --accent-dark: #e85d00;
+  /* 橙粉色按钮、横幅上的文字。用深棕色，对比度约 5:1，白字只有 2.6:1 看不清（Codex 第 7 轮） */
+  --accent-text: #3b2a1a;
+  --accent-soft: #fff0dd;
+  --yellow: #ffd23f;
+  --yellow-soft: #fff6cc;
+  --pink: #ff6b9d;
+  --mint: #2ec4a6;
+  --excluded: #c9b8a6;
+  --radius: 18px;
+  --shadow: 0 6px 18px rgba(232, 93, 0, 0.12);
+  color-scheme: light;
+}
 
 *,
 *::before,
@@ -10,6 +32,36 @@ body {
   margin: 0;
   font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
   line-height: 1.6;
-  color: #222;
-  background: #fafafa;
+  color: var(--text);
+  background-color: var(--bg);
+  /* 淡淡的波点背景 */
+  background-image: radial-gradient(var(--bg-dot) 2px, transparent 2px);
+  background-size: 26px 26px;
+  -webkit-text-size-adjust: 100%;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 3px solid var(--yellow);
+  outline-offset: 2px;
+}
+
+/* 系统设置了“减少动画”时，所有动画都关掉 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }

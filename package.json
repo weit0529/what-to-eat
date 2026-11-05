@@ -14,6 +14,7 @@
     "prebuild": "npm run menu",
     "build": "vite build",
     "preview": "vite preview",
+    "pretest": "npm run menu",
     "test": "vitest run",
     "test:watch": "vitest"
   },
