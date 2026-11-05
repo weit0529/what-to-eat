@@ -3,6 +3,8 @@
 帮不知道这一餐吃什么的人快速做决定：随机抽一个，或者按口味、预算、天气等条件推荐。
 推荐的是出去吃或点外卖的品类、店铺。
 
+网址：**https://weit0529.github.io/what-to-eat/**
+
 > 想改菜单？看 [docs/菜单填写说明.md](docs/菜单填写说明.md)，只需要改 Excel 表格，不用碰代码。
 >
 > 技术栈：Vue 3 + Vite，测试用 Vitest，发布到 GitHub Pages。
