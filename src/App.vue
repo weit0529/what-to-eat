@@ -19,7 +19,7 @@ import DrawPage from './components/DrawPage.vue'
     </header>
 
     <main>
-      <DrawPage :items="menu.items" />
+      <DrawPage :items="menu.items" :meals="menu.meals" />
     </main>
 
     <footer class="app-footer">

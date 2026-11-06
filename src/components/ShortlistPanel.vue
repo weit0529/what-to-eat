@@ -58,7 +58,7 @@ function clearAll() {
         </button>
       </li>
     </ul>
-    <p v-else class="hint">还是空的。可以在下面挑，或者在“帮我分析”的结果上点“加入小名单”。</p>
+    <p v-else class="hint">还是空的。从菜单里挑，或者在“帮我分析”里加。</p>
 
     <div class="actions">
       <button type="button" class="link picker-toggle" :aria-expanded="showPicker" @click="showPicker = !showPicker">
@@ -81,7 +81,7 @@ function clearAll() {
       </button>
     </div>
 
-    <p class="hint small">加了第一道菜就会自动打开开关，清空后自动关掉。小名单不管餐次和“不想吃的”，刷新页面就清空。</p>
+    <p v-if="showPicker" class="hint small">加了第一道菜就会自动打开开关，清空后自动关掉。小名单不管餐次和“不想吃的”，刷新页面就清空。</p>
   </section>
 </template>
 

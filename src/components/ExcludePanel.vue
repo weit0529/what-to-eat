@@ -1,5 +1,6 @@
 <!--
   临时排除：勾掉这次不想吃的分类或单道菜。只影响这一次，刷新页面就恢复。
+  默认收起，只显示一行摘要，点标题展开（用户 2026-11-05 决定 1A）。
   用法：
     <ExcludePanel
       :items="这一餐的菜"
@@ -8,7 +9,7 @@
     />
 -->
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, useId } from 'vue'
 import { listCategories } from '../core/draw.js'
 import { emojiForCategory } from '../ui/food-emoji.js'
 
@@ -22,6 +23,10 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:excludedCategories', 'update:excludedIds'])
+
+/** 整块是否展开（默认收起） */
+const open = ref(false)
+const bodyId = `exclude-body-${useId()}`
 
 /** 是否展开“按菜排除”的列表 */
 const showDishes = ref(false)
@@ -77,11 +82,17 @@ const dishLabel = (item) => (item.shop ? `${item.name} · ${item.shop}` : item.n
 <template>
   <section class="exclude-panel" aria-labelledby="exclude-title">
     <div class="head">
-      <h2 id="exclude-title"><span aria-hidden="true">🙅 </span>不想吃的</h2>
-      <span class="summary">{{ summary }}</span>
+      <h2 id="exclude-title">
+        <button type="button" class="panel-toggle" :aria-expanded="open" :aria-controls="bodyId" @click="open = !open">
+          <span class="title"><span aria-hidden="true">🙅 </span>不想吃的</span>
+          <span class="summary">{{ summary }}</span>
+          <span class="caret" aria-hidden="true">{{ open ? '▲' : '▼' }}</span>
+        </button>
+      </h2>
       <button v-if="hasExclusions" type="button" class="link" @click="clearAll">全部恢复</button>
     </div>
 
+    <div v-show="open" :id="bodyId" class="body">
     <div class="chips">
       <button
         v-for="category in categories"
@@ -122,6 +133,7 @@ const dishLabel = (item) => (item.shop ? `${item.name} · ${item.shop}` : item.n
       </fieldset>
       <p class="hint">勾上的这次不会抽到。整类排除的菜在上面点分类恢复。</p>
     </div>
+    </div>
   </section>
 </template>
 
@@ -142,9 +154,32 @@ const dishLabel = (item) => (item.shop ? `${item.name} · ${item.shop}` : item.n
 }
 
 h2 {
+  flex: 1;
+  min-width: 0;
   margin: 0;
   font-size: 1.05rem;
   font-weight: 800;
+}
+
+/* 标题整行是一个按钮：点一下展开或收起 */
+.panel-toggle {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  text-align: left;
+}
+
+.caret {
+  margin-left: auto;
+  color: var(--accent-dark);
+  font-size: 0.85rem;
 }
 
 .summary {

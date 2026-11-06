@@ -4,7 +4,9 @@
   随机模式里还有临时小名单（5A）：打开开关后只在名单里抽，不受餐次和“不想吃的”限制。
   往小名单里加第一道菜时自动打开开关，清空时自动关掉；在“帮我分析”页面下方
   显示气泡“选好小名单了，去随机抽食物”，点一下跳到随机抽（用户 2026-11-05 11:56 要求）。
-  所有选择只存在页面里，刷新就恢复原样（需求 R-006）。
+  “最近吃过”（阶段 3）：结果卡片上点“就吃这个”记一次，存在本机浏览器；
+  打开“避开最近吃过的”时，随机抽和分析推荐都避开最近 3 天吃过的，小名单不避开。
+  除了“最近吃过”的记录，其他选择只存在页面里，刷新就恢复原样（需求 R-006）。
   抽取逻辑在 src/core/draw.js，推荐逻辑在 src/core/recommend.js，这里只负责界面和状态。
 -->
 <script setup>
@@ -12,21 +14,90 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { MEALS } from '../core/menu-data.js'
 import { itemsForMeal, getCandidates, emptyReason, drawOne } from '../core/draw.js'
 import { shortlistItems } from '../core/recommend.js'
+import { recentRecords, recentIds, addRecord, removeToday, eatenToday } from '../core/eaten.js'
+import { getStorage, loadRecords, saveRecords } from '../ui/eaten-store.js'
 import MealPicker from './MealPicker.vue'
 import ExcludePanel from './ExcludePanel.vue'
 import ResultCard from './ResultCard.vue'
 import Mascot from './Mascot.vue'
 import ShortlistPanel from './ShortlistPanel.vue'
 import AnalyzePanel from './AnalyzePanel.vue'
+import RecentPanel from './RecentPanel.vue'
+import EatButton from './EatButton.vue'
 
 const props = defineProps({
   /** 全部菜品（menu.json 的 items） */
   items: { type: Array, required: true },
+  /** 全部餐次（menu.json 的 meals）；不传就只有早、午、晚 */
+  meals: { type: Array, default: () => MEALS },
   /** 随机数函数。默认 Math.random；测试时换成固定值 */
   random: { type: Function, default: Math.random },
   /** 抽取动画的时长（毫秒）。0 表示不要动画；系统设置了“减少动画”时也不播放 */
   rollDuration: { type: Number, default: 700 },
+  /** 存“最近吃过”的地方。不传就用浏览器的 localStorage；传 null 表示不存（测试用） */
+  storage: { type: Object, default: undefined },
 })
+
+// “最近吃过”的记录
+const storage = props.storage === undefined ? getStorage() : props.storage
+/** 记录能不能存住：拿不到存储时为 false；之后每次保存失败也会变成 false（Codex 第 13 轮） */
+const storageOk = ref(storage !== null)
+const eatenRecords = ref(loadRecords(storage))
+const avoidRecent = ref(true) // 是否避开最近吃过的（默认打开）
+
+/**
+ * “现在”的时间。“最近 3 天”按它来算。页面一直开着跨过午夜时要更新它：
+ * 抽取、推荐、换餐次、换模式、页面从后台切回来时都刷新一次（Codex 第 13 轮）；
+ * 另外在午夜过后自动刷新一次，免得“都吃过了、按钮不能点”的时候没有办法触发刷新（Codex 第 14 轮）
+ */
+const now = ref(Date.now())
+let midnightTimer = null
+function refreshNow() {
+  now.value = Date.now()
+  scheduleMidnight()
+}
+/** 定一个闹钟：下一个午夜过 1 秒时刷新 */
+function scheduleMidnight() {
+  clearTimeout(midnightTimer)
+  const next = new Date(now.value)
+  next.setHours(24, 0, 1, 0)
+  midnightTimer = setTimeout(refreshNow, next.getTime() - now.value)
+}
+scheduleMidnight()
+function onVisible() {
+  if (document.visibilityState === 'visible') refreshNow()
+}
+if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisible)
+onBeforeUnmount(() => {
+  clearTimeout(midnightTimer)
+  if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisible)
+})
+
+const recentList = computed(() => recentRecords(eatenRecords.value, new Date(now.value)))
+/** 要避开的菜品 id：开关关着时为空 */
+const avoidIds = computed(() => (avoidRecent.value ? recentIds(eatenRecords.value, new Date(now.value)) : []))
+/** 给分析面板用：推荐前先刷新时间，再拿要避开的 id */
+function freshAvoidIds() {
+  refreshNow()
+  return avoidIds.value
+}
+
+function setRecords(records) {
+  eatenRecords.value = records
+  storageOk.value = saveRecords(records, storage)
+}
+/** 点“就吃这个”：今天还没记过就记一条，记过了就撤销 */
+function toggleEaten(item) {
+  refreshNow()
+  const at = new Date(now.value)
+  setRecords(
+    eatenToday(eatenRecords.value, item.id, at)
+      ? removeToday(eatenRecords.value, item.id, at)
+      : addRecord(eatenRecords.value, item, at),
+  )
+}
+const isEatenToday = (item) => eatenToday(eatenRecords.value, item.id, new Date(now.value))
+const eatenTodayIds = computed(() => props.items.filter((item) => isEatenToday(item)).map((item) => item.id))
 
 // ---- 页面状态 ----
 const meal = ref(null) // 选中的餐次，没选是 null
@@ -47,22 +118,34 @@ const choice = computed(() => ({
   excludedCategories: excludedCategories.value,
   excludedIds: excludedIds.value,
 }))
-const candidates = computed(() => {
+/** 还没去掉“最近吃过”的候选。结果被清掉只看它：点了“就吃这个”的菜不会因此从屏幕上消失 */
+const baseCandidates = computed(() => {
   if (!meal.value) return []
-  // 小名单开着时，只在名单里抽，不管餐次和“不想吃的”
+  // 小名单开着时，只在名单里抽，不管餐次、“不想吃的”和“最近吃过”（7A）
   if (shortlistOn.value) return shortlistItems(props.items, shortlist.value)
   return getCandidates(props.items, choice.value)
+})
+/** 真正用来抽的候选：再去掉最近吃过的 */
+const candidates = computed(() => {
+  if (shortlistOn.value) return baseCandidates.value
+  const avoid = new Set(avoidIds.value)
+  return baseCandidates.value.filter((item) => !avoid.has(item.id))
 })
 const empty = computed(() => {
   if (!meal.value) return null
   if (shortlistOn.value) return candidates.value.length === 0 ? 'shortlist-empty' : null
-  return emptyReason(props.items, choice.value)
+  const reason = emptyReason(props.items, choice.value)
+  if (reason) return reason
+  return candidates.value.length === 0 ? 'all-recent' : null
 })
 const showExclude = computed(() => mealItems.value.length > 0 && !(mode.value === 'random' && shortlistOn.value))
-const mealLabel = computed(() => MEALS.find((m) => m.id === meal.value)?.label ?? '')
+const mealLabel = computed(() => props.meals.find((m) => m.id === meal.value)?.label ?? '')
 
 /** 吉祥物的表情：抽取中抖得欢，抽中了蹦一下，平时轻轻跳 */
 const mascotMood = computed(() => (rolling.value ? 'excited' : result.value ? 'cheer' : 'happy'))
+
+// 换餐次、换模式时刷新“现在”的时间
+watch([meal, mode], refreshNow)
 
 // 换餐次时，停掉动画，清掉上一次的结果
 watch(meal, () => {
@@ -73,7 +156,7 @@ watch(meal, () => {
 
 // 动画期间改了“不想吃的”、小名单或开关、或者切到别的模式：取消这次抽取，请用户重新点
 // （结果是动画开始前定的，可能已经不在候选里了）
-watch([excludedCategories, excludedIds, shortlist, shortlistOn, mode], () => {
+watch([excludedCategories, excludedIds, shortlist, shortlistOn, mode, avoidRecent, eatenRecords], () => {
   if (!rolling.value) return
   stopRolling()
   cancelled.value = true
@@ -99,7 +182,7 @@ async function goDrawFromShortlist() {
 }
 
 // 排除了当前结果所在的分类或这道菜时，结果也清掉，免得显示一道“不想吃”的菜
-watch(candidates, (list) => {
+watch(baseCandidates, (list) => {
   if (result.value && !list.some((item) => item.id === result.value.id)) result.value = null
 })
 
@@ -122,6 +205,7 @@ function prefersReducedMotion() {
 
 function draw() {
   if (rolling.value) return
+  refreshNow()
   cancelled.value = false
   // 结果先定好，动画只是好看。动画期间改排除会取消这次抽取（见上面的 watch）
   const picked = drawOne(candidates.value, { random: props.random, avoidId: result.value?.id ?? null })
@@ -151,7 +235,7 @@ function draw() {
 
 <template>
   <div class="draw-page" :class="{ 'has-bubble': showBubble }">
-    <MealPicker v-model="meal" :items="items" />
+    <MealPicker v-model="meal" :items="items" :meals="meals" />
 
     <p v-if="!meal" class="prompt"><span class="point" aria-hidden="true">👆</span> 先选这是哪一餐</p>
 
@@ -186,14 +270,27 @@ function draw() {
         :items="mealItems"
       />
 
+      <RecentPanel
+        v-if="showExclude"
+        v-model:avoid="avoidRecent"
+        :records="recentList"
+        :storage-ok="storageOk"
+        @clear="setRecords([])"
+      />
+
       <AnalyzePanel
         v-if="mode === 'analyze'"
         v-model:shortlist="shortlist"
         :items="items"
         :meal="meal"
+        :meal-label="mealLabel"
         :excluded-categories="excludedCategories"
         :excluded-ids="excludedIds"
+        :get-recent-ids="freshAvoidIds"
+        :avoid-recent="avoidRecent"
+        :eaten-today-ids="eatenTodayIds"
         :random="random"
+        @toggle-eaten="toggleEaten"
       />
 
       <template v-else>
@@ -233,6 +330,10 @@ function draw() {
             <span class="empty-emoji" aria-hidden="true">🙈</span>
             能选的都被排除了，在上面点“全部恢复”或者少排除几个试试。
           </p>
+          <p v-else-if="empty === 'all-recent' && !result" class="empty">
+            <span class="empty-emoji" aria-hidden="true">🕒</span>
+            能选的最近几天都吃过了。在“最近吃过”里关掉“避开”，或者少排除几个试试。
+          </p>
           <p v-else-if="empty === 'shortlist-empty'" class="empty">
             <span class="empty-emoji" aria-hidden="true">📝</span>
             小名单还是空的，先往里加几道菜吧。
@@ -245,7 +346,11 @@ function draw() {
             <span class="empty-emoji" aria-hidden="true">🫣</span>
             改了条件，这次没抽完。再点一次“帮我选！”吧
           </p>
-          <ResultCard v-else-if="result" :key="result.id" :item="result" />
+          <ResultCard v-else-if="result" :key="result.id" :item="result">
+            <EatButton :eaten="isEatenToday(result)" @toggle="toggleEaten(result)" />
+            <!-- 刚记下的是这一餐最后一道能选的：卡片留着（可以撤销），只在下面提示（Codex 第 13 轮） -->
+            <p v-if="empty === 'all-recent'" class="last-note">这一餐能选的最近都吃过了，想再抽可以在“最近吃过”里关掉“避开”。</p>
+          </ResultCard>
         </div>
       </template>
     </template>
@@ -478,6 +583,12 @@ function draw() {
   display: block;
   font-size: 2.4rem;
   line-height: 1.3;
+}
+
+.last-note {
+  margin: 12px 0 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
 }
 
 .rolling {

@@ -51,9 +51,34 @@ export function emojiForCategory(category) {
   return FALLBACK_EMOJI
 }
 
-/** 三个餐次的 emoji */
+/** 三个固定餐次的 emoji */
 export const MEAL_EMOJI = {
   breakfast: '🌅',
   lunch: '🌞',
   dinner: '🌙',
+}
+
+// 额外餐次没填图标时，按名字里的关键字猜一个
+const MEAL_RULES = [
+  ['宵', '🌃'],
+  ['夜', '🌃'],
+  ['茶', '🧋'],
+  ['甜', '🍰'],
+  ['点心', '🧁'],
+  ['零食', '🍿'],
+  ['加餐', '🍪'],
+  ['早午', '🥞'],
+]
+
+/**
+ * 餐次的 emoji：固定餐次用上面的；额外餐次用“餐次”页填的图标，没填就按名字猜，猜不到用 🍽️
+ * @param {{ id: string, label: string, emoji?: string | null }} meal
+ */
+export function emojiForMeal(meal) {
+  if (MEAL_EMOJI[meal.id]) return MEAL_EMOJI[meal.id]
+  if (meal.emoji) return meal.emoji
+  for (const [keyword, emoji] of MEAL_RULES) {
+    if (meal.label.includes(keyword)) return emoji
+  }
+  return FALLBACK_EMOJI
 }

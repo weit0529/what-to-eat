@@ -2,7 +2,8 @@
 //
 // 规则（用户 2026-11-05 确认，见 REQUIREMENTS.md 第 10 节）：
 // 1. 先按餐次和“不想吃的”筛（和随机抽取一样，见 draw.js）
-// 2. 再筛掉带“不要”标签的菜、超出预算的菜（没填价格的菜不筛，标“价格未填”）
+// 2. 再筛掉带“不要”标签的菜、超出预算的菜（没填价格的菜不筛，标“价格未填”）、
+//    最近吃过的菜（页面打开了“避开最近吃过的”时才传进来，阶段 3 加的）
 // 3. 剩下的按命中“想要”标签的个数打分，每个标签 1 分
 // 4. 最高分里随机选一道作推荐；再给最多 3 道“也不错”的备选
 // 5. 一个想要的标签都没命中时，不硬推，提示少选几个
@@ -47,6 +48,7 @@ export function assessItem(item, { wantTags = [], budget = null } = {}) {
  * @param {string[]} [criteria.wantTags] 想要的标签
  * @param {string[]} [criteria.avoidTags] 不要的标签：带其中任何一个的菜直接筛掉
  * @param {number|null} [criteria.budget] 人均预算（元），null 表示不限
+ * @param {string[]} [criteria.recentIds] 要避开的“最近吃过的”菜品 id
  * @param {object} [options]
  * @param {() => number} [options.random] 随机数函数，默认 Math.random
  * @param {string|null} [options.avoidId] “换一个”时传上一次推荐的 id，尽量换成别的
@@ -61,18 +63,26 @@ export function assessItem(item, { wantTags = [], budget = null } = {}) {
  * }}
  *   status：ok = 有推荐；none = 有菜，但一个想要的标签都没命中；empty = 筛完没有菜了
  *   emptyReason：empty 时的原因。all-filtered 表示被“不要”的标签或预算筛光了
- *   filtered：被“不要”的标签、被预算各筛掉了几道（先算标签，再算预算）
+ *   filtered：被“不要”的标签、被预算、因为最近吃过各筛掉了几道（按这个顺序算）
  *   match：all = 推荐的菜命中了全部想要的标签（没选想要的标签时也算 all）；partial = 只命中一部分
  *   pick、alternatives 里每一项都是 assessItem() 的结果
  */
 export function recommend(items, criteria, { random = Math.random, avoidId = null } = {}) {
-  const { meal, excludedCategories = [], excludedIds = [], wantTags = [], avoidTags = [], budget = null } = criteria
+  const {
+    meal,
+    excludedCategories = [],
+    excludedIds = [],
+    wantTags = [],
+    avoidTags = [],
+    budget = null,
+    recentIds = [],
+  } = criteria
   assertBudget(budget)
 
   const result = {
     status: 'empty',
     emptyReason: null,
-    filtered: { byAvoid: 0, byBudget: 0 },
+    filtered: { byAvoid: 0, byBudget: 0, byRecent: 0 },
     match: null,
     pick: null,
     alternatives: [],
@@ -90,15 +100,21 @@ export function recommend(items, criteria, { random = Math.random, avoidId = nul
   const avoid = new Set(avoidTags)
   const noAvoided = base.filter((item) => !item.tags.some((tag) => avoid.has(tag)))
   const inBudget = noAvoided.filter((item) => budget === null || item.price === null || item.price <= budget)
-  result.filtered = { byAvoid: base.length - noAvoided.length, byBudget: noAvoided.length - inBudget.length }
-  if (inBudget.length === 0) {
+  const recent = new Set(recentIds)
+  const notRecent = inBudget.filter((item) => !recent.has(item.id))
+  result.filtered = {
+    byAvoid: base.length - noAvoided.length,
+    byBudget: noAvoided.length - inBudget.length,
+    byRecent: inBudget.length - notRecent.length,
+  }
+  if (notRecent.length === 0) {
     result.emptyReason = 'all-filtered'
     return result
   }
 
   // 3. 打分，按分数从高到低排；同分保持表格顺序
   const wants = [...new Set(wantTags)]
-  const ranked = inBudget
+  const ranked = notRecent
     .map((item) => assessItem(item, { wantTags: wants, budget }))
     .sort((a, b) => b.score - a.score)
 

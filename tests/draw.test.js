@@ -31,9 +31,17 @@ describe('itemsForMeal', () => {
     expect(names(itemsForMeal(MENU, 'dinner'))).toEqual(['牛肉面', '牛肉面@楼下', '火锅', '麻辣烫'])
   })
 
-  it('餐次写错时报错（属于程序写错）', () => {
-    expect(() => itemsForMeal(MENU, '早餐')).toThrow('餐次只能是')
-    expect(() => itemsForMeal(MENU, undefined)).toThrow('餐次只能是')
+  it('没传餐次或不是文字时报错（属于程序写错）', () => {
+    for (const bad of [undefined, null, '', 3]) {
+      expect(() => itemsForMeal(MENU, bad), String(bad)).toThrow('餐次必须是')
+    }
+  })
+
+  it('额外餐次（id 就是名字）也能筛；没有菜适合时返回空', () => {
+    const menu = [...MENU, dish('奶茶', '饮品甜点', ['下午茶']), dish('烧烤', '烧烤', ['dinner', '夜宵'])]
+    expect(names(itemsForMeal(menu, '下午茶'))).toEqual(['奶茶'])
+    expect(names(itemsForMeal(menu, '夜宵'))).toEqual(['烧烤'])
+    expect(itemsForMeal(menu, '早午餐')).toEqual([])
   })
 })
 

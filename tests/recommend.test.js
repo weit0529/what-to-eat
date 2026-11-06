@@ -49,12 +49,12 @@ describe('recommend：筛选', () => {
   it('带“不要”标签的菜直接筛掉，并计数', () => {
     const r = recommend(MENU, { ...LUNCH, avoidTags: ['辣'] }, { random: () => 0 })
     expect([r.pick, ...r.alternatives].every((a) => !a.item.tags.includes('辣'))).toBe(true)
-    expect(r.filtered).toEqual({ byAvoid: 1, byBudget: 0 })
+    expect(r.filtered).toEqual({ byAvoid: 1, byBudget: 0, byRecent: 0 })
   })
 
   it('超出预算的筛掉；没填价格的保留并标“价格未填”', () => {
     const r = recommend(MENU, { ...LUNCH, budget: 20, wantTags: ['适合一个人'] }, { random: () => 0 })
-    expect(r.filtered).toEqual({ byAvoid: 0, byBudget: 2 }) // 麻辣烫 25、寿司 50
+    expect(r.filtered).toEqual({ byAvoid: 0, byBudget: 2, byRecent: 0 }) // 麻辣烫 25、寿司 50
     expect(r.pick.item.name).toBe('黄焖鸡')
     expect(r.pick.priceStatus).toBe('unknown')
     expect(names(r.alternatives)).toEqual([])
@@ -68,7 +68,7 @@ describe('recommend：筛选', () => {
   it('筛完没菜了：说明原因和各筛掉几道', () => {
     const r = recommend(MENU, { ...LUNCH, budget: 10, avoidTags: ['下饭'] })
     expect(r).toMatchObject({ status: 'empty', emptyReason: 'all-filtered', pick: null, alternatives: [] })
-    expect(r.filtered).toEqual({ byAvoid: 1, byBudget: 3 })
+    expect(r.filtered).toEqual({ byAvoid: 1, byBudget: 3, byRecent: 0 })
   })
 
   it('这一餐本来没菜、或全被“不想吃的”排除：沿用随机抽取的原因', () => {
@@ -197,7 +197,7 @@ describe('groupTags', () => {
     expect(groupTags([{ tags: [] }])).toEqual([])
   })
 
-  it('建议标签分组和填写说明第五节一致，且没有重复的标签', async () => {
+  it('建议标签分组和填写说明第六节一致，且没有重复的标签', async () => {
     const fs = await import('node:fs')
     const path = await import('node:path')
     // 测试从项目根目录运行

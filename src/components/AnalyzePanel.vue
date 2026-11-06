@@ -10,25 +10,36 @@
     />
 -->
 <script setup>
-import { computed, ref, watch } from 'vue'
-import { MEALS } from '../core/menu-data.js'
+import { computed, ref, useId, watch } from 'vue'
 import { itemsForMeal } from '../core/draw.js'
 import { recommend, toggleShortlist } from '../core/recommend.js'
 import { groupTags } from '../core/tags.js'
 import ResultCard from './ResultCard.vue'
 import Mascot from './Mascot.vue'
+import EatButton from './EatButton.vue'
 
 const props = defineProps({
   items: { type: Array, required: true },
   meal: { type: String, required: true },
+  /** 餐次的中文名，显示提示用 */
+  mealLabel: { type: String, default: '' },
   excludedCategories: { type: Array, required: true },
   excludedIds: { type: Array, required: true },
   shortlist: { type: Array, required: true },
+  /**
+   * 拿要避开的“最近吃过的”菜品 id（开关关着时为空）。用函数而不是数组：
+   * 推荐的那一刻要按当时的日期重新算，页面开着跨过午夜也不会用旧的（Codex 第 13 轮）
+   */
+  getRecentIds: { type: Function, default: () => [] },
+  /** “避开最近吃过的”开关；切换时清掉旧推荐 */
+  avoidRecent: { type: Boolean, default: true },
+  /** 今天已经点过“就吃这个”的菜品 id，用来显示按钮状态 */
+  eatenTodayIds: { type: Array, default: () => [] },
   /** 随机数函数。默认 Math.random；测试时换成固定值 */
   random: { type: Function, default: Math.random },
 })
 
-const emit = defineEmits(['update:shortlist'])
+const emit = defineEmits(['update:shortlist', 'toggle-eaten'])
 
 // ---- 条件 ----
 /** 每个标签的状态：'want'（想要）/ 'avoid'（不要）；没有记录就是没选 */
@@ -38,7 +49,6 @@ const budgetText = ref('')
 /** 推荐结果（recommend() 的返回值），还没推荐时是 null */
 const result = ref(null)
 
-const mealLabel = computed(() => MEALS.find((m) => m.id === props.meal)?.label ?? '')
 
 /** 这一餐的菜里出现过的标签，按建议分组 */
 const groups = computed(() => groupTags(itemsForMeal(props.items, props.meal)))
@@ -70,8 +80,9 @@ const criteria = computed(() => ({
   budget: budget.value,
 }))
 
-// 条件一变，旧的推荐就不作数了
-watch(criteria, () => {
+// 条件一变，旧的推荐就不作数了。
+// 点“就吃这个”会让最近吃过的变化，但不应该把刚推荐的菜清掉，所以这里只看开关，不看记录
+watch([criteria, () => props.avoidRecent], () => {
   result.value = null
 })
 
@@ -81,8 +92,14 @@ const summary = computed(() => {
   const parts = []
   if (wantTags.value.length > 0) parts.push(`想要 ${wantTags.value.length} 个`)
   if (avoidTags.value.length > 0) parts.push(`不要 ${avoidTags.value.length} 个`)
+  if (budgetError.value) parts.push('预算填错了')
+  else if (budget.value !== null) parts.push(`预算 ${budget.value} 元`)
   return parts.length > 0 ? parts.join('、') : '还没选'
 })
+
+/** 条件区是否展开（默认收起，只显示摘要；用户 2026-11-05 决定 1A） */
+const open = ref(false)
+const bodyId = `conditions-body-${useId()}`
 
 /** 点一下标签：没选 → 想要 → 不要 → 没选 */
 function cycleTag(tag) {
@@ -103,7 +120,8 @@ const stateLabel = (tag) => ({ want: '想要', avoid: '不要' })[tagState.value
 // ---- 推荐 ----
 function recommendNow() {
   const avoidId = result.value?.pick?.item.id ?? null
-  result.value = recommend(props.items, criteria.value, { random: props.random, avoidId })
+  const fullCriteria = { ...criteria.value, recentIds: props.getRecentIds() }
+  result.value = recommend(props.items, fullCriteria, { random: props.random, avoidId })
 }
 
 const inShortlist = (item) => props.shortlist.includes(item.id)
@@ -121,6 +139,7 @@ const filteredText = computed(() => {
   const parts = []
   if (f.byAvoid > 0) parts.push(`${f.byAvoid} 道带“不要”的标签`)
   if (f.byBudget > 0) parts.push(`${f.byBudget} 道超出预算`)
+  if (f.byRecent > 0) parts.push(`${f.byRecent} 道最近吃过`)
   return parts.join('，')
 })
 
@@ -131,10 +150,16 @@ const mascotMood = computed(() => (result.value?.status === 'ok' ? 'cheer' : 'ha
   <div class="analyze-panel">
     <section class="conditions" aria-labelledby="tags-title">
       <div class="head">
-        <h2 id="tags-title"><span aria-hidden="true">🏷️ </span>想吃点什么样的？</h2>
-        <span class="summary">{{ summary }}</span>
+        <h2 id="tags-title">
+          <button type="button" class="panel-toggle" :aria-expanded="open" :aria-controls="bodyId" @click="open = !open">
+            <span class="title"><span aria-hidden="true">🏷️ </span>想吃点什么样的？</span>
+            <span class="summary">{{ summary }}</span>
+            <span class="caret" aria-hidden="true">{{ open ? '▲' : '▼' }}</span>
+          </button>
+        </h2>
         <button v-if="hasConditions" type="button" class="link" @click="clearConditions">清空条件</button>
       </div>
+      <div v-show="open" :id="bodyId" class="body">
       <p class="hint">点一下 = 想要 ✅，再点一下 = 不要 🚫，第三下取消。都不选也行。</p>
 
       <p v-if="groups.length === 0" class="hint">这一餐的菜还没有标签，可以在菜单表格的“标签”列里加。</p>
@@ -173,6 +198,7 @@ const mascotMood = computed(() => (result.value?.status === 'ok' ? 'cheer' : 'ha
         <span>元以内</span>
       </div>
       <p v-if="budgetError" class="error">预算只填数字，比如 30。现在先按“不限”算。</p>
+      </div>
     </section>
 
     <div class="action">
@@ -198,7 +224,7 @@ const mascotMood = computed(() => (result.value?.status === 'ok' ? 'cheer' : 'ha
         </p>
         <p v-else-if="result.emptyReason === 'all-filtered'" class="empty">
           <span class="empty-emoji" aria-hidden="true">🙈</span>
-          都被筛掉了：{{ filteredText }}。少选几个“不要”或者放宽预算试试。
+          都被筛掉了：{{ filteredText }}。少选几个“不要”、放宽预算，或者在“最近吃过”里关掉“避开”试试。
         </p>
         <p v-else-if="result.status === 'none'" class="empty">
           <span class="empty-emoji" aria-hidden="true">🤷</span>
@@ -224,6 +250,10 @@ const mascotMood = computed(() => (result.value?.status === 'ok' ? 'cheer' : 'ha
                 <span aria-hidden="true">❔ </span>价格未填
               </li>
             </ul>
+            <EatButton
+              :eaten="eatenTodayIds.includes(result.pick.item.id)"
+              @toggle="emit('toggle-eaten', result.pick.item)"
+            />
             <button type="button" class="shortlist-button" @click="toggleInShortlist(result.pick.item)">
               {{ inShortlist(result.pick.item) ? '✓ 已在小名单（点一下移出）' : '➕ 加入小名单' }}
             </button>
@@ -273,9 +303,32 @@ const mascotMood = computed(() => (result.value?.status === 'ok' ? 'cheer' : 'ha
 }
 
 h2 {
+  flex: 1;
+  min-width: 0;
   margin: 0;
   font-size: 1.05rem;
   font-weight: 800;
+}
+
+/* 标题整行是一个按钮：点一下展开或收起 */
+.panel-toggle {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  text-align: left;
+}
+
+.caret {
+  margin-left: auto;
+  color: var(--accent-dark);
+  font-size: 0.85rem;
 }
 
 h3 {

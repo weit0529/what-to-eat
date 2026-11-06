@@ -5,14 +5,13 @@
 //
 // 菜品的格式见 src/core/menu-data.js 的 parseMenuRows()。
 
-import { MEALS } from './menu-data.js'
-
-const MEAL_IDS = MEALS.map((meal) => meal.id)
-
-/** 检查餐次是不是 breakfast / lunch / dinner 之一。传错了属于程序写错，直接报错 */
+/**
+ * 检查餐次 id：breakfast / lunch / dinner，或者“餐次”页里加的额外餐次（id 就是名字，如“夜宵”）。
+ * 没传或不是文字属于程序写错，直接报错
+ */
 function assertMeal(meal) {
-  if (!MEAL_IDS.includes(meal)) {
-    throw new Error(`餐次只能是 ${MEAL_IDS.join(' / ')}，收到的是 ${JSON.stringify(meal)}`)
+  if (typeof meal !== 'string' || meal === '') {
+    throw new Error(`餐次必须是餐次的 id（如 breakfast、夜宵），收到的是 ${JSON.stringify(meal)}`)
   }
 }
 

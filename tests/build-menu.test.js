@@ -73,6 +73,38 @@ describe('buildMenu', () => {
     expect(result.warnings.map((w) => w.row)).toEqual([2, 3])
   })
 
+  it('读“餐次”页的额外餐次，写进 meals；“填写说明”页不影响', async () => {
+    const result = await buildMenu({ input: path.join(fixtures, 'menu-meals.xlsx'), output, imagesDir })
+    expect(result.ok).toBe(true)
+    const data = JSON.parse(fs.readFileSync(output, 'utf8'))
+    expect(data.meals.map((m) => [m.id, m.builtIn])).toEqual([
+      ['breakfast', true],
+      ['lunch', true],
+      ['dinner', true],
+      ['下午茶', false],
+      ['夜宵', false],
+    ])
+    expect(data.items.map((i) => [i.name, i.meals])).toEqual([
+      ['烧烤', ['dinner', '夜宵']],
+      ['奶茶', ['下午茶']],
+      ['馄饨', ['breakfast', 'lunch', 'dinner']],
+    ])
+    // 这个测试表格是 openpyxl 写的，emoji 被存成“&#数字;”，读表格的库会读坏；应该提醒而不是显示坏字
+    expect(data.meals[3].emoji).toBeNull()
+    expect(result.warnings).toEqual([expect.objectContaining({ sheet: '餐次', row: 2, column: '图标' })])
+  })
+
+  it('没有“餐次”页时只有早、午、晚', async () => {
+    const result = await buildMenu({ input: path.join(fixtures, 'menu-ok.xlsx'), output, imagesDir })
+    expect(result.meals.map((m) => m.id)).toEqual(['breakfast', 'lunch', 'dinner'])
+  })
+
+  it('“餐次”页被拖到最前面时报错，提示把“菜单”页拖回去', async () => {
+    const result = await buildMenu({ input: path.join(fixtures, 'menu-meals-first.xlsx'), output, imagesDir })
+    expect(result.ok).toBe(false)
+    expect(result.errors[0].message).toContain('第一页应该是菜单')
+  })
+
   it('图片文件夹不存在时，有图片的菜只提醒', async () => {
     const result = await buildMenu({
       input: path.join(fixtures, 'menu-ok.xlsx'),

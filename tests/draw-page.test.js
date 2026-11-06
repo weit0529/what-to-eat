@@ -25,6 +25,7 @@ function mountPage(props = {}) {
 }
 
 afterEach(() => {
+  localStorage.clear() // “最近吃过”存在浏览器里，测试之间不能串
   wrappers.splice(0).forEach((w) => w.unmount())
   vi.useRealTimers()
 })

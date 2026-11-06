@@ -3,7 +3,10 @@
 // 这里只做纯数据处理，不读写文件、不依赖页面。
 // 所以转换脚本（scripts/build-menu.js）在用它，以后的管理页面、小程序也能直接复用。
 
-/** 三个餐次。id 是存进数据里的英文名，label 是显示给人看的中文名 */
+/**
+ * 三个固定的餐次。id 是存进数据里的英文名，label 是显示给人看的中文名。
+ * 另外还可以在 Excel 的“餐次”页里加额外的餐次（如下午茶、夜宵），见 parseMealRows()。
+ */
 export const MEALS = [
   { id: 'breakfast', label: '早餐' },
   { id: 'lunch', label: '午餐' },
@@ -129,17 +132,113 @@ function readHeader(headerRow) {
   return { columnIndex, errors, warnings }
 }
 
-/** 解析“适合餐次”，返回 { meals, unknown }，unknown 是不认识的词 */
-function parseMeals(text) {
+/**
+ * 解析“适合餐次”，返回 { meals, unknown }，unknown 是不认识的词。
+ * words：认得的词 → 餐次 id；order：输出的顺序（早→午→晚→额外餐次）
+ */
+function parseMeals(text, words, order) {
   const meals = new Set()
   const unknown = []
   for (const word of splitList(text, MEAL_SEPARATOR)) {
-    const ids = MEAL_WORDS.get(word)
+    const ids = words.get(word)
     if (ids) ids.forEach((id) => meals.add(id))
     else unknown.push(word)
   }
-  // 按 早→午→晚 的固定顺序输出
-  return { meals: ALL_MEAL_IDS.filter((id) => meals.has(id)), unknown }
+  return { meals: order.filter((id) => meals.has(id)), unknown }
+}
+
+// ---------------- 额外餐次（Excel 的“餐次”页） ----------------
+
+/** “餐次”页的列 */
+export const MEAL_SHEET_COLUMNS = {
+  label: { title: '餐次', required: true },
+  emoji: { title: '图标' },
+}
+
+/** “餐次”页最多加几个餐次（页面上一行放 3 个，最多两行） */
+export const MAX_EXTRA_MEALS = 6
+
+/** 餐次名不能用的字：这些符号在“适合餐次”里用来隔开几个餐次 */
+const MEAL_NAME_FORBIDDEN = /[、,，;；\s]/
+
+/**
+ * 读“餐次”页：额外的餐次（早、午、晚之外的），按表格顺序。
+ * 额外餐次的 id 就是它的名字（例如“夜宵”），和固定餐次的英文 id 不会重名。
+ *
+ * @param {Array<Array<any>>} rows “餐次”页的内容，第一行是列名
+ * @returns {{ meals: Array<{ id: string, label: string, emoji: string | null }>,
+ *             errors: object[], warnings: object[] }}
+ *   错误和提醒都带 sheet: '餐次'，row 是 Excel 里的行号
+ */
+export function parseMealRows(rows) {
+  const sheet = '餐次'
+  const meals = []
+  const errors = []
+  const warnings = []
+  const issue = (list, row, column, message) => list.push({ sheet, row, column, message })
+
+  if (!rows || rows.length === 0 || isEmptyRow(rows[0])) {
+    // 整页空着：当作没有额外餐次
+    return { meals, errors, warnings }
+  }
+
+  // 列名
+  const titleToKey = Object.fromEntries(Object.entries(MEAL_SHEET_COLUMNS).map(([k, c]) => [c.title, k]))
+  const columnIndex = {}
+  rows[0].forEach((value, index) => {
+    const title = cellText(value)
+    if (title === '') return
+    const key = titleToKey[title]
+    if (!key) issue(warnings, 1, title, '不认识这一列，已忽略')
+    else if (key in columnIndex) issue(errors, 1, title, '这一列出现了两次，请删掉一列')
+    else columnIndex[key] = index
+  })
+  if (!('label' in columnIndex)) issue(errors, 1, '餐次', '缺少这一列。第一行必须有这个列名')
+  if (errors.length > 0) return { meals, errors, warnings }
+
+  const cell = (row, key) => (key in columnIndex ? row[columnIndex[key]] : null)
+  const firstRowOf = new Map()
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i]
+    const excelRow = i + 1
+    if (isEmptyRow(row)) continue
+
+    const label = cellText(cell(row, 'label'))
+    let emoji = cellText(cell(row, 'emoji')) || null
+
+    if (label === '') {
+      issue(errors, excelRow, '餐次', '不能为空')
+      continue
+    }
+    if (MEAL_NAME_FORBIDDEN.test(label)) {
+      issue(errors, excelRow, '餐次', '名字里不能有顿号、逗号、分号或空格（“适合餐次”里用它们隔开几个餐次）')
+      continue
+    }
+    if (MEAL_WORDS.has(label) || ALL_MEAL_IDS.includes(label)) {
+      issue(errors, excelRow, '餐次', `“${label}”和早餐、午餐、晚餐、全天这些固定的词重了，换个名字`)
+      continue
+    }
+    if (firstRowOf.has(label)) {
+      issue(errors, excelRow, '餐次', `和第 ${firstRowOf.get(label)} 行重复`)
+      continue
+    }
+    firstRowOf.set(label, excelRow)
+
+    // 图标只要一个 emoji。不是 emoji、或者太长的，提醒并改用自动配的图标。
+    // 注意：有些工具（比如 Python 的 openpyxl）把 emoji 存成“&#数字;”，读表格的库会把它读坏成别的字，
+    // 这里也会因为“不是 emoji”而提醒，不会把读坏的字显示到网页上。用 Excel / WPS 直接填没有这个问题
+    if (emoji && (!/\p{Extended_Pictographic}/u.test(emoji) || [...emoji].length > 4)) {
+      issue(warnings, excelRow, '图标', `“${emoji}”不是一个 emoji，或者太长了。先用自动配的图标`)
+      emoji = null
+    }
+    meals.push({ id: label, label, emoji })
+  }
+
+  if (meals.length > MAX_EXTRA_MEALS) {
+    issue(errors, 1, '餐次', `最多加 ${MAX_EXTRA_MEALS} 个餐次，现在有 ${meals.length} 个`)
+  }
+  return { meals: errors.length > 0 ? [] : meals, errors, warnings }
 }
 
 /** 解析“人均价格”。返回 { price } 或 { error } */
@@ -202,8 +301,9 @@ function checkImage(fileName, imageFiles) {
  * 把整张表格转换成菜品列表。
  *
  * @param {Array<Array<any>>} rows 表格内容，第一行是列名
- * @param {{ imageFiles?: string[] | null }} [options]
+ * @param {{ imageFiles?: string[] | null, extraMeals?: Array<{ id: string, label: string }> }} [options]
  *   imageFiles：图片文件夹里实际有的文件名，用来检查图片是否存在；不传就不检查
+ *   extraMeals：“餐次”页里加的额外餐次（parseMealRows 的结果），“适合餐次”里可以填它们的名字
  * @returns {{
  *   items: Array<object>,   启用的菜品（停用的不放进来）
  *   errors: Array<{row: number, column?: string, message: string}>,   必须改的错误
@@ -214,6 +314,12 @@ function checkImage(fileName, imageFiles) {
  */
 export function parseMenuRows(rows, options = {}) {
   const imageFiles = options.imageFiles ?? null
+  const extraMeals = options.extraMeals ?? []
+  // 认得的餐次词：固定的词 + 额外餐次的名字。“全天”只含早、午、晚（用户 2026-11-05 决定 3A）
+  const mealWords = new Map(MEAL_WORDS)
+  extraMeals.forEach((meal) => mealWords.set(meal.label, [meal.id]))
+  const mealOrder = [...ALL_MEAL_IDS, ...extraMeals.map((meal) => meal.id)]
+  const mealNames = ['早餐', '午餐', '晚餐', ...extraMeals.map((meal) => meal.label), '全天'].join('、')
   const errors = []
   const warnings = []
   const items = []
@@ -256,11 +362,11 @@ export function parseMenuRows(rows, options = {}) {
     else if (LIST_SEPARATOR.test(category)) addError('category', '只能填一个分类')
 
     // 只填了标点（比如“、，”）时拆出来什么都没有，和没填一样处理
-    const { meals, unknown } = parseMeals(mealsText)
+    const { meals, unknown } = parseMeals(mealsText, mealWords, mealOrder)
     if (unknown.length > 0) {
-      addError('meals', `不认识“${unknown.join('、')}”。只能填早餐、午餐、晚餐、全天`)
+      addError('meals', `不认识“${unknown.join('、')}”。只能填${mealNames}`)
     } else if (meals.length === 0) {
-      addError('meals', '不能为空。填早餐、午餐、晚餐中的一个或几个，或者填“全天”')
+      addError('meals', `不能为空。填${mealNames.replace('、全天', '')}中的一个或几个，或者填“全天”`)
     }
 
     const price = parsePrice(cell(row, 'price'))
@@ -323,8 +429,12 @@ export function parseMenuRows(rows, options = {}) {
   return { items, errors, warnings, disabledCount }
 }
 
-/** 把一条错误或提醒变成一句话，例如“第 3 行「分类」：不能为空” */
+/**
+ * 把一条错误或提醒变成一句话，例如“第 3 行「分类」：不能为空”。
+ * 不在菜单页的（比如“餐次”页）前面加上页名：“「餐次」页第 2 行「餐次」：不能为空”
+ */
 export function formatIssue(issue) {
-  const where = issue.column ? `第 ${issue.row} 行「${issue.column}」` : `第 ${issue.row} 行`
+  const sheet = issue.sheet ? `「${issue.sheet}」页` : ''
+  const where = issue.column ? `${sheet}第 ${issue.row} 行「${issue.column}」` : `${sheet}第 ${issue.row} 行`
   return `${where}：${issue.message}`
 }
