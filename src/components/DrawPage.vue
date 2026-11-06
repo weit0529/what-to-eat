@@ -250,7 +250,7 @@ function draw() {
           data-mode="random"
           @click="mode = 'random'"
         >
-          <IconDice5 :size="18" :stroke-width="1.75" aria-hidden="true" />随机抽
+          <IconDice5 :size="16" :stroke-width="1.75" aria-hidden="true" />随机抽
         </button>
         <button
           type="button"
@@ -260,7 +260,7 @@ function draw() {
           data-mode="analyze"
           @click="mode = 'analyze'"
         >
-          <IconSearch :size="18" :stroke-width="1.75" aria-hidden="true" />帮我分析
+          <IconSearch :size="16" :stroke-width="1.75" aria-hidden="true" />帮我分析
         </button>
       </div>
 
@@ -363,13 +363,16 @@ function draw() {
   color: var(--text-muted);
 }
 
+/* 模式开关：小胶囊形的二选一（用户 2026-11-06），居中，不占满整行 */
 .mode-tabs {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  margin-top: 16px;
-  padding: 4px;
-  border-radius: var(--radius);
+  display: flex;
+  width: max-content;
+  max-width: 100%;
+  gap: 2px;
+  margin: 16px auto 0;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
   background: var(--surface);
 }
 
@@ -378,13 +381,15 @@ function draw() {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 40px;
-  padding: 6px 10px;
+  min-height: 34px;
+  padding: 4px 16px;
   border: none;
-  border-radius: var(--radius-inner);
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--text-muted);
+  font-size: var(--fs-sm);
   font-weight: 700;
+  white-space: nowrap;
 }
 
 /* 选中的模式：和选中餐次一样用浅橙底、深橙字 */

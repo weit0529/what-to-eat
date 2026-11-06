@@ -54,11 +54,15 @@ const modeTab = (w, mode) => w.find(`.mode-tab[data-mode="${mode}"]`)
 const resultName = (w) => (w.find('.result-card .name').exists() ? w.find('.result-card .name').text() : null)
 
 describe('额外餐次按钮（2B）', () => {
-  it('早午晚还是第一行三个；下午茶、夜宵在下面，带图标和数量', async () => {
+  it('转盘上按时间顺序排；下午茶、夜宵是额外餐次，带图标和数量', async () => {
     const w = mountPage()
     const all = w.findAll('.meal')
-    expect(all.slice(0, 3).map((b) => b.find('.label').text())).toEqual(['早餐', '午餐', '晚餐'])
-    expect(all.slice(0, 3).every((b) => !b.classes().includes('extra'))).toBe(true)
+    expect(all.map((b) => b.find('.label').text())).toEqual(['早餐', '午餐', '下午茶', '晚餐', '夜宵'])
+    expect(all.filter((b) => !b.classes().includes('extra')).map((b) => b.find('.label').text())).toEqual([
+      '早餐',
+      '午餐',
+      '晚餐',
+    ])
     const extra = w.findAll('.meal.extra')
     expect(extra.map((b) => b.find('.label').text())).toEqual(['下午茶', '夜宵'])
     // 图标是 Tabler 的 SVG（不再是 emoji）：下午茶是杯子，夜宵是月亮和星星
