@@ -56,3 +56,22 @@ describe('MealPicker 转盘', () => {
     expect(w.findAll('.meal.selected')).toHaveLength(0)
   })
 })
+
+describe('转盘两边的“是啊”“吃什么”', () => {
+  it('左边“是啊”、右边“吃什么”，一个字一个 span，读屏跳过', () => {
+    const w = picker(MEALS)
+    const left = w.find('.side-left')
+    const right = w.find('.side-right')
+    expect(left.findAll('span').map((s) => s.text())).toEqual(['是', '啊'])
+    expect(right.findAll('span').map((s) => s.text())).toEqual(['吃', '什', '么'])
+    expect(left.attributes('aria-hidden')).toBe('true')
+    expect(right.attributes('aria-hidden')).toBe('true')
+  })
+
+  it('每个字歪的角度和浮动的先后不同（逐字波浪）', () => {
+    const spans = picker(MEALS).findAll('.side span')
+    const delays = spans.map((s) => s.attributes('style').match(/animation-delay:\s*([\d.]+)s/)[1])
+    expect(new Set(delays).size).toBe(5)
+    expect(spans.every((s) => /--tilt:\s*-?\d+deg/.test(s.attributes('style')))).toBe(true)
+  })
+})

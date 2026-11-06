@@ -136,10 +136,27 @@ watch(
 const needlePath = `M${C - 6} ${C}L${C} ${C - (INNER - 14)}L${C + 6} ${C}Z`
 
 const choose = (id) => emit('update:modelValue', id)
+
+/**
+ * 转盘左右两边的字，连起来读是“是啊……吃什么”。
+ * 每个字歪一点（tilt），浮动时往反方向摆，看起来晃晃悠悠；delay 让字轮流浮动，像波浪。
+ */
+const sideChars = (text, offset) =>
+  [...text].map((ch, i) => ({
+    ch,
+    style: { '--tilt': `${SIDE_TILTS[(offset + i) % SIDE_TILTS.length]}deg`, animationDelay: `${(offset + i) * 0.3}s` },
+  }))
+const SIDE_TILTS = [-10, 8, 7, -9, 10]
+const SIDE_LEFT = sideChars('是啊', 0)
+const SIDE_RIGHT = sideChars('吃什么', 2)
 </script>
 
 <template>
   <div class="meal-picker">
+    <!-- 转盘两边的“是啊”“吃什么”，一个字一个字晃着浮动（用户 2026-11-06 10:45）；只是装饰，读屏跳过 -->
+    <p class="side side-left" aria-hidden="true">
+      <span v-for="(c, i) in SIDE_LEFT" :key="i" :style="c.style">{{ c.ch }}</span>
+    </p>
     <svg class="dial" :viewBox="`0 0 ${SIZE} ${SIZE}`" role="group" aria-label="选择这一餐">
       <g
         v-for="seg in segments"
@@ -192,20 +209,109 @@ const choose = (id) => emit('update:modelValue', id)
       <circle class="hub" :cx="C" :cy="C" r="9" />
       <circle class="hub-dot" :cx="C" :cy="C" r="3.5" />
     </svg>
+    <p class="side side-right" aria-hidden="true">
+      <span v-for="(c, i) in SIDE_RIGHT" :key="i" :style="c.style">{{ c.ch }}</span>
+    </p>
   </div>
 </template>
 
 <style scoped>
 .meal-picker {
   display: flex;
+  align-items: center;
   justify-content: center;
+  gap: 8px;
 }
 
 .dial {
   display: block;
-  width: min(248px, 100%);
+  flex: 0 1 248px;
+  min-width: 0;
+  width: 248px;
+  max-width: 248px;
   height: auto;
   overflow: visible;
+}
+
+/*
+  两边字用的字体：站酷快乐体（SIL OFL 1.1）。许可证原文在 public/licenses/ZCOOL-KuaiLe-OFL.txt，
+  会随网站一起发布（网址 licenses/ZCOOL-KuaiLe-OFL.txt），满足 OFL“每份副本附许可证”的要求（Codex 第 20 轮）。
+  只抽出了“是啊吃什么”这 5 个字（约 1KB），构建时直接内嵌进 CSS，不用另外下载。
+*/
+@font-face {
+  font-family: 'WTE Side';
+  src: url('../assets/fonts/zcool-kuaile-side.woff2') format('woff2');
+  font-display: swap;
+}
+
+/*
+  两边的字（用户 2026-11-06 10:47 选竖排、深绿、逐字波浪；随后选站酷快乐体 + 橙色硬影子）：
+  竖排，和转盘垂直居中；每个字歪一点，轮流上下浮动并左右摇摆。
+  38px 是这两处装饰字专用的字号，不算正文的四种字号（用户看过 38px 的样子后选的）。
+*/
+.side {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 40px;
+  margin: 0;
+  color: var(--brand-dark);
+  font-family: 'WTE Side', system-ui, sans-serif;
+  font-size: 38px;
+  font-weight: 400;
+  line-height: 1.05;
+  text-shadow: 2px 2px 0 var(--accent);
+  user-select: none;
+}
+
+.side span {
+  display: block;
+  transform: rotate(var(--tilt));
+  animation: side-float 2.4s ease-in-out infinite;
+}
+
+/*
+  窄屏（如 320px 宽）：两边的字缩到 28px，并借用页面左右留白，
+  让转盘保持 248px，转盘里的字不会缩到 12px 以下（DESIGN.md 最小字号）
+*/
+@media (max-width: 360px) {
+  .meal-picker {
+    gap: 2px;
+    margin: 0 -14px;
+  }
+
+  .side {
+    width: 28px;
+    font-size: 28px;
+  }
+}
+
+/*
+  更窄的屏幕（≤295px，如折叠屏合上时 280px）：两边放不下字还要保证转盘里的字不小于 12px，
+  所以不显示这两处装饰字（Codex 第 20 轮：280px 时转盘里的字只有 11.3px）
+*/
+@media (max-width: 295px) {
+  .side {
+    display: none;
+  }
+
+  /* 借用页面左右各 12px 留白给转盘：240px 宽时转盘 232px，里面最小的字约 12.2px（Codex 第 21 轮）；
+     比 237px 还窄的屏幕基本没有，不再单独处理 */
+  .meal-picker {
+    margin: 0 -12px;
+  }
+}
+
+/* 上下浮动、左右摇摆；系统设置“减少动画”时不动，字停在歪着的样子（style.css 全局规则） */
+@keyframes side-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(var(--tilt));
+  }
+  50% {
+    transform: translateY(-5px) rotate(calc(var(--tilt) * -0.6));
+  }
 }
 
 .meal {
