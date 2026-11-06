@@ -74,7 +74,7 @@ export async function buildMenu({ input, output, imagesDir } = DEFAULT_PATHS) {
   // 餐次页的问题排在前面：餐次错了，菜单里的“适合餐次”也会跟着报错
   result.errors = [...mealResult.errors, ...result.errors]
   result.warnings = [...mealResult.warnings, ...result.warnings]
-  const meals = [...MEALS.map((m) => ({ ...m, emoji: null, builtIn: true })), ...mealResult.meals.map((m) => ({ ...m, builtIn: false }))]
+  const meals = [...MEALS.map((m) => ({ ...m, builtIn: true })), ...mealResult.meals.map((m) => ({ ...m, builtIn: false }))]
   if (result.errors.length > 0) return { ok: false, meals: [], ...result }
 
   const data = { version: MENU_FORMAT_VERSION, meals, items: result.items }

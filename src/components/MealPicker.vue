@@ -8,7 +8,7 @@
 import { computed } from 'vue'
 import { MEALS } from '../core/menu-data.js'
 import { itemsForMeal } from '../core/draw.js'
-import { emojiForMeal } from '../ui/food-emoji.js'
+import { iconForMeal } from '../ui/icons.js'
 
 const props = defineProps({
   /** 当前选中的餐次 id，还没选时是 null */
@@ -21,7 +21,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue'])
 
-const toOption = (meal) => ({ ...meal, emoji: emojiForMeal(meal), count: itemsForMeal(props.items, meal.id).length })
+const toOption = (meal) => ({ ...meal, icon: iconForMeal(meal), count: itemsForMeal(props.items, meal.id).length })
 const builtInIds = MEALS.map((meal) => meal.id)
 /** 早、午、晚 */
 const options = computed(() => props.meals.filter((meal) => builtInIds.includes(meal.id)).map(toOption))
@@ -40,7 +40,7 @@ const extraOptions = computed(() => props.meals.filter((meal) => !builtInIds.inc
       :aria-pressed="option.id === modelValue"
       @click="emit('update:modelValue', option.id)"
     >
-      <span class="emoji" aria-hidden="true">{{ option.emoji }}</span>
+      <component :is="option.icon" class="meal-icon" :size="24" :stroke-width="1.75" aria-hidden="true" />
       <span class="label">{{ option.label }}</span>
       <span class="count">{{ option.count }} 道</span>
     </button>
@@ -54,8 +54,10 @@ const extraOptions = computed(() => props.meals.filter((meal) => !builtInIds.inc
       :aria-pressed="option.id === modelValue"
       @click="emit('update:modelValue', option.id)"
     >
-      <span class="emoji" aria-hidden="true">{{ option.emoji }}</span>
-      <span class="label">{{ option.label }}</span>
+      <span class="with-icon">
+        <component :is="option.icon" class="meal-icon" :size="18" :stroke-width="1.75" aria-hidden="true" />
+        <span class="label">{{ option.label }}</span>
+      </span>
       <span class="count">{{ option.count }} 道</span>
     </button>
   </div>
@@ -65,88 +67,58 @@ const extraOptions = computed(() => props.meals.filter((meal) => !builtInIds.inc
 .meal-picker {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  gap: 8px;
 }
 
 .meal {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 12px 4px 10px;
-  border: 3px solid var(--border);
+  justify-content: center;
+  gap: 2px;
+  min-height: 88px;
+  padding: 10px 4px;
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
-  box-shadow: 0 4px 0 var(--border);
   transition:
-    transform 0.15s,
-    border-color 0.15s,
-    background 0.15s;
-}
-
-.meal:hover:not(.selected) {
-  transform: translateY(-2px);
+    border-color 0.12s,
+    background 0.12s;
 }
 
 .meal:active {
-  transform: translateY(2px);
-  box-shadow: 0 2px 0 var(--border);
+  background: var(--surface-muted);
 }
 
 .meal.selected {
   border-color: var(--accent);
-  background: var(--yellow-soft);
-  box-shadow: 0 4px 0 var(--accent-dark);
-  transform: rotate(-2deg) scale(1.04);
+  background: var(--accent-soft);
 }
 
-.meal.selected .emoji {
-  animation: bounce 0.5s ease-out;
-}
-
-.emoji {
-  font-size: 1.9rem;
-  line-height: 1.2;
-}
-
-/* 额外餐次：比早午晚矮一些，emoji 和名字排一行，数量小字在下面 */
-.meal.extra {
-  flex-direction: row;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 0 4px;
-  padding: 6px 4px;
-  white-space: nowrap;
-}
-
-.meal.extra .count {
-  flex-basis: 100%;
-  text-align: center;
-  font-size: 0.72rem;
-  line-height: 1.2;
-}
-
-.meal.extra .emoji {
-  font-size: 1.2rem;
-}
-
-.meal.extra .label {
-  font-size: 0.98rem;
-}
-
-.label {
-  font-size: 1.1rem;
-  font-weight: 800;
-}
-
-.count {
-  font-size: 0.8rem;
+.meal-icon {
   color: var(--text-muted);
 }
 
-@keyframes bounce {
-  40% {
-    transform: translateY(-8px) scale(1.15);
-  }
+.meal.selected .meal-icon {
+  color: var(--accent-strong);
+}
+
+.label {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.count {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+
+/* 额外餐次：比早午晚矮，图标和名字一行，数量在下面 */
+.meal.extra {
+  min-height: 56px;
+  padding: 6px 4px;
+  white-space: nowrap;
 }
 </style>

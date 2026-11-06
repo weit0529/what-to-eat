@@ -19,6 +19,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@tabler/icons-vue": "^3.50.0",
     "vue": "^3.5.44"
   },
   "devDependencies": {

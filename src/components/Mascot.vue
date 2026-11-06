@@ -2,7 +2,8 @@
   小吉祥物“饭团”：一个眯眼笑、脸红红的白饭团，坐在黄色的小饭碗里。
   按用户给的参考图用 SVG 线条画出来（不是贴图片），放大缩小都清楚。
   用法：<Mascot mood="happy" />
-    mood：happy（平时，轻轻跳）/ excited（抽取中，抖得欢）/ cheer（抽中了，蹦一下）
+    mood：happy（平时，不动）/ excited（抽取中，抖得欢）/ cheer（抽中了，蹦一下）
+    平时不做一直在动的装饰动画，只在抽取、抽中时给反馈（用户 2026-11-06 同意 de-slop 第 7 条）
     flip：是否左右翻转（放在按钮右边时用）
 -->
 <script setup>
@@ -101,32 +102,18 @@ const clipId = `mascot-bowl-${useId()}`
   transform: scaleX(-1);
 }
 
-.happy {
-  animation: bob 1.6s ease-in-out infinite;
-}
-
 .excited {
   animation: shake 0.18s linear infinite;
 }
 
 .cheer {
-  animation: hop 0.5s ease-out 2;
+  animation: hop 0.4s ease-out 1;
 }
 
 /* 抽取中，饭团在碗里左右晃 */
 .excited .rice {
   transform-origin: 60px 60px;
   animation: wiggle 0.3s ease-in-out infinite;
-}
-
-@keyframes bob {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-4px);
-  }
 }
 
 @keyframes shake {

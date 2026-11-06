@@ -60,19 +60,19 @@ describe('ResultCard', () => {
   })
 })
 
-describe('ResultCard 的 emoji 和标题', () => {
-  it('没有图片时显示分类 emoji，有图片时不显示', () => {
-    expect(card({}).find('.emoji-art').text()).toBe('🍲')
-    expect(card({ image: 'a.jpg' }).find('.emoji-art').exists()).toBe(false)
+describe('ResultCard 的分类图标（不用 emoji）', () => {
+  it('没有图片时显示分类图标，有图片时不显示', () => {
+    expect(card({}).find('.icon-art svg').exists()).toBe(true)
+    expect(card({ image: 'a.jpg' }).find('.icon-art').exists()).toBe(false)
   })
 
-  it('图片加载失败后改显示 emoji', async () => {
+  it('图片加载失败后改显示分类图标', async () => {
     const w = card({ image: 'broken.jpg' })
     await w.find('img').trigger('error')
-    expect(w.find('.emoji-art').exists()).toBe(true)
+    expect(w.find('.icon-art svg').exists()).toBe(true)
   })
 
-  it('卡片顶部有“就吃它！”', () => {
-    expect(card({}).find('.ribbon').text()).toContain('就吃它！')
+  it('没有“就吃它！”横幅（de-slop：和卡片本身重复）', () => {
+    expect(card({}).find('.ribbon').exists()).toBe(false)
   })
 })

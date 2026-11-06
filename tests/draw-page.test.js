@@ -31,8 +31,8 @@ afterEach(() => {
 })
 
 const mealButton = (w, label) => w.findAll('.meal').find((b) => b.find('.label').text() === label)
-// 分类按钮的文字是“emoji 分类名 数量”，按分类名找
-const chip = (w, name) => w.findAll('.chip').find((b) => b.text().split(/\s+/).includes(name))
+// “不想吃的”里的分类按钮，按分类名找
+const chip = (w, name) => w.findAll('.exclude-panel .chip').find((b) => b.find('.chip-name').text() === name)
 const drawButton = (w) => w.find('.draw-button')
 const resultName = (w) => (w.find('.result-card').exists() ? w.find('.result-card .name').text() : null)
 const resultShop = (w) =>

@@ -9,9 +9,11 @@
     />
 -->
 <script setup>
-import { computed, ref, useId } from 'vue'
+import { computed, ref } from 'vue'
 import { listCategories } from '../core/draw.js'
-import { emojiForCategory } from '../ui/food-emoji.js'
+import { IconBan, IconChevronDown } from '@tabler/icons-vue'
+import { iconForCategory } from '../ui/icons.js'
+import CollapsePanel from './CollapsePanel.vue'
 
 const props = defineProps({
   /** 这一餐的菜（已经按餐次筛过） */
@@ -23,10 +25,6 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:excludedCategories', 'update:excludedIds'])
-
-/** 整块是否展开（默认收起） */
-const open = ref(false)
-const bodyId = `exclude-body-${useId()}`
 
 /** 是否展开“按菜排除”的列表 */
 const showDishes = ref(false)
@@ -80,19 +78,11 @@ const dishLabel = (item) => (item.shop ? `${item.name} · ${item.shop}` : item.n
 </script>
 
 <template>
-  <section class="exclude-panel" aria-labelledby="exclude-title">
-    <div class="head">
-      <h2 id="exclude-title">
-        <button type="button" class="panel-toggle" :aria-expanded="open" :aria-controls="bodyId" @click="open = !open">
-          <span class="title"><span aria-hidden="true">🙅 </span>不想吃的</span>
-          <span class="summary">{{ summary }}</span>
-          <span class="caret" aria-hidden="true">{{ open ? '▲' : '▼' }}</span>
-        </button>
-      </h2>
+  <CollapsePanel class="exclude-panel" title="不想吃的" :icon="IconBan" :summary="summary">
+    <template #actions>
       <button v-if="hasExclusions" type="button" class="link" @click="clearAll">全部恢复</button>
-    </div>
+    </template>
 
-    <div v-show="open" :id="bodyId" class="body">
     <div class="chips">
       <button
         v-for="category in categories"
@@ -104,24 +94,21 @@ const dishLabel = (item) => (item.shop ? `${item.name} · ${item.shop}` : item.n
         :title="isCategoryExcluded(category.name) ? '点一下恢复' : '点一下排除这一类'"
         @click="toggleCategory(category.name)"
       >
-        <span class="chip-emoji" aria-hidden="true">{{ emojiForCategory(category.name) }}</span>
-        {{ category.name }} <span class="chip-count">{{ category.count }}</span>
+        <component :is="iconForCategory(category.name)" class="chip-icon" :size="16" :stroke-width="1.75" aria-hidden="true" />
+        <span class="chip-name">{{ category.name }}</span>
+        <span class="chip-count">{{ category.count }}</span>
       </button>
     </div>
 
-    <button type="button" class="link toggle-dishes" :aria-expanded="showDishes" @click="showDishes = !showDishes">
-      {{ showDishes ? '收起 ▲' : '按菜排除 ▼' }}
+    <button type="button" class="link toggle-dishes with-icon" :aria-expanded="showDishes" @click="showDishes = !showDishes">
+      {{ showDishes ? '收起单道菜' : '按菜排除' }}
+      <IconChevronDown class="caret" :class="{ open: showDishes }" :size="16" :stroke-width="2" aria-hidden="true" />
     </button>
 
     <div v-if="showDishes" class="dishes">
       <fieldset v-for="group in dishGroups" :key="group.name" class="dish-group">
-        <legend><span aria-hidden="true">{{ emojiForCategory(group.name) }} </span>{{ group.name }}</legend>
-        <label
-          v-for="item in group.dishes"
-          :key="item.id"
-          class="dish"
-          :class="{ excluded: isDishExcluded(item) }"
-        >
+        <legend>{{ group.name }}</legend>
+        <label v-for="item in group.dishes" :key="item.id" class="dish" :class="{ excluded: isDishExcluded(item) }">
           <input
             type="checkbox"
             :checked="isDishExcluded(item)"
@@ -131,123 +118,78 @@ const dishLabel = (item) => (item.shop ? `${item.name} · ${item.shop}` : item.n
           {{ dishLabel(item) }}
         </label>
       </fieldset>
-      <p class="hint">勾上的这次不会抽到。整类排除的菜在上面点分类恢复。</p>
+      <p class="hint">勾上的这次不会抽到。整类排除的，在上面点分类恢复。</p>
     </div>
-    </div>
-  </section>
+  </CollapsePanel>
 </template>
 
 <style scoped>
-.exclude-panel {
-  margin-top: 22px;
-  padding: 14px 16px;
-  border: 3px dashed var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-}
-
-.head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-h2 {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-  font-size: 1.05rem;
-  font-weight: 800;
-}
-
-/* 标题整行是一个按钮：点一下展开或收起 */
-.panel-toggle {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 4px 8px;
-  width: 100%;
-  min-height: 32px;
-  padding: 0;
-  border: none;
-  background: none;
-  font: inherit;
-  text-align: left;
-}
-
-.caret {
-  margin-left: auto;
-  color: var(--accent-dark);
-  font-size: 0.85rem;
-}
-
-.summary {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-}
-
-.link {
-  margin-left: auto;
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--accent-dark);
-  font-size: 0.9rem;
-  font-weight: 700;
-}
-
 .chips {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 10px;
 }
 
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  min-height: 34px;
+  gap: 4px;
+  min-height: 32px;
   max-width: 100%;
-  padding: 3px 12px;
-  border: 2px solid var(--border);
-  border-radius: 999px;
-  background: var(--accent-soft);
-  font-size: 0.9rem;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-size: var(--fs-sm);
+  line-height: 1.3;
+}
+
+.chip-icon {
+  color: var(--text-muted);
+}
+
+.chip-name {
   overflow-wrap: anywhere;
-  transition: transform 0.15s;
-}
-
-.chip:hover {
-  transform: rotate(-3deg);
-}
-
-.chip-emoji {
-  margin-right: 2px;
 }
 
 .chip-count {
-  margin-left: 2px;
   color: var(--text-muted);
-  font-size: 0.8rem;
 }
 
 .chip.excluded {
-  background: var(--surface);
-  color: var(--excluded);
-  text-decoration: line-through;
   border-style: dashed;
+  background: transparent;
+  color: var(--excluded);
 }
 
-.chip.excluded .chip-emoji {
-  filter: grayscale(1);
-  opacity: 0.5;
+.chip.excluded .chip-name {
+  text-decoration: line-through;
+}
+
+.chip.excluded .chip-icon {
+  color: var(--excluded);
+}
+
+.link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent-strong);
+  font-size: var(--fs-sm);
+  font-weight: 700;
 }
 
 .toggle-dishes {
-  display: block;
-  margin: 12px 0 0;
+  margin-top: 12px;
+  gap: 2px;
+}
+
+.caret {
+  transition: transform 0.15s;
+}
+
+.caret.open {
+  transform: rotate(180deg);
 }
 
 .dishes {
@@ -262,23 +204,25 @@ h2 {
 
 legend {
   padding: 0;
-  font-size: 0.85rem;
-  font-weight: 700;
   color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 700;
 }
 
 .dish {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  margin: 2px 14px 2px 0;
-  font-size: 0.95rem;
+  gap: 6px;
+  min-height: 32px;
+  margin-right: 16px;
+  font-size: var(--fs-md);
   overflow-wrap: anywhere;
 }
 
 .dish input {
   width: 18px;
   height: 18px;
+  margin: 0;
   accent-color: var(--accent);
 }
 
@@ -288,8 +232,8 @@ legend {
 }
 
 .hint {
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   color: var(--text-muted);
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
 }
 </style>

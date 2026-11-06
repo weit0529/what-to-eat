@@ -24,6 +24,7 @@ import ShortlistPanel from './ShortlistPanel.vue'
 import AnalyzePanel from './AnalyzePanel.vue'
 import RecentPanel from './RecentPanel.vue'
 import EatButton from './EatButton.vue'
+import { IconArrowRight, IconDice5, IconListCheck, IconRefresh, IconSearch } from '@tabler/icons-vue'
 
 const props = defineProps({
   /** 全部菜品（menu.json 的 items） */
@@ -237,7 +238,7 @@ function draw() {
   <div class="draw-page" :class="{ 'has-bubble': showBubble }">
     <MealPicker v-model="meal" :items="items" :meals="meals" />
 
-    <p v-if="!meal" class="prompt"><span class="point" aria-hidden="true">👆</span> 先选这是哪一餐</p>
+    <p v-if="!meal" class="prompt">先选这是哪一餐</p>
 
     <template v-else>
       <div class="mode-tabs" role="group" aria-label="选择模式">
@@ -249,7 +250,7 @@ function draw() {
           data-mode="random"
           @click="mode = 'random'"
         >
-          <span aria-hidden="true">🎲 </span>随机抽
+          <IconDice5 :size="18" :stroke-width="1.75" aria-hidden="true" />随机抽
         </button>
         <button
           type="button"
@@ -259,7 +260,7 @@ function draw() {
           data-mode="analyze"
           @click="mode = 'analyze'"
         >
-          <span aria-hidden="true">🔍 </span>帮我分析
+          <IconSearch :size="18" :stroke-width="1.75" aria-hidden="true" />帮我分析
         </button>
       </div>
 
@@ -303,15 +304,10 @@ function draw() {
 
         <div class="action">
           <div class="button-row">
-            <!-- key 跟着状态变，换表情时重新播放动画 -->
+            <!-- key 跟着状态变，换表情时重新播放一次反应动画 -->
             <Mascot :key="`l-${mascotMood}-${result?.id}`" :mood="mascotMood" />
-            <button
-              type="button"
-              class="draw-button"
-              :disabled="candidates.length === 0 || rolling"
-              @click="draw"
-            >
-              <span class="btn-emoji" aria-hidden="true">{{ result ? '🔄' : '🎲' }}</span>
+            <button type="button" class="draw-button" :disabled="candidates.length === 0 || rolling" @click="draw">
+              <component :is="result ? IconRefresh : IconDice5" :size="22" :stroke-width="2" aria-hidden="true" />
               <span class="btn-label">{{ result ? '再抽一次' : '帮我选！' }}</span>
             </button>
             <Mascot :key="`r-${mascotMood}-${result?.id}`" :mood="mascotMood" flip />
@@ -323,29 +319,18 @@ function draw() {
 
         <div class="outcome" aria-live="polite">
           <p v-if="empty === 'no-items-for-meal'" class="empty">
-            <span class="empty-emoji" aria-hidden="true">🫙</span>
             菜单里还没有适合{{ mealLabel }}的菜。可以在菜单表格的“适合餐次”里加上“{{ mealLabel }}”。
           </p>
-          <p v-else-if="empty === 'all-excluded'" class="empty">
-            <span class="empty-emoji" aria-hidden="true">🙈</span>
-            能选的都被排除了，在上面点“全部恢复”或者少排除几个试试。
-          </p>
+          <p v-else-if="empty === 'all-excluded'" class="empty">能选的都被排除了，点“全部恢复”或者少排除几个试试。</p>
           <p v-else-if="empty === 'all-recent' && !result" class="empty">
-            <span class="empty-emoji" aria-hidden="true">🕒</span>
             能选的最近几天都吃过了。在“最近吃过”里关掉“避开”，或者少排除几个试试。
           </p>
-          <p v-else-if="empty === 'shortlist-empty'" class="empty">
-            <span class="empty-emoji" aria-hidden="true">📝</span>
-            小名单还是空的，先往里加几道菜吧。
-          </p>
+          <p v-else-if="empty === 'shortlist-empty'" class="empty">小名单还是空的，先往里加几道菜。</p>
           <div v-else-if="rolling" class="rolling" aria-hidden="true">
-            <span class="slot">🎰</span>
+            <IconDice5 class="rolling-icon" :size="28" :stroke-width="1.75" />
             <span class="rolling-name">{{ rollingName }}</span>
           </div>
-          <p v-else-if="cancelled" class="empty">
-            <span class="empty-emoji" aria-hidden="true">🫣</span>
-            改了条件，这次没抽完。再点一次“帮我选！”吧
-          </p>
+          <p v-else-if="cancelled" class="empty">改了条件，这次没抽完。再点一次“帮我选！”</p>
           <ResultCard v-else-if="result" :key="result.id" :item="result">
             <EatButton :eaten="isEatenToday(result)" @toggle="toggleEaten(result)" />
             <!-- 刚记下的是这一餐最后一道能选的：卡片留着（可以撤销），只在下面提示（Codex 第 13 轮） -->
@@ -357,7 +342,9 @@ function draw() {
 
     <!-- 小名单气泡：固定在屏幕下方 -->
     <button v-if="showBubble" type="button" class="shortlist-bubble" @click="goDrawFromShortlist">
-      <span aria-hidden="true">📝 </span>选好小名单了，去随机抽食物<span class="bubble-arrow" aria-hidden="true"> 👉</span>
+      <IconListCheck :size="18" :stroke-width="1.75" aria-hidden="true" />
+      <span>选好小名单了，去随机抽食物</span>
+      <IconArrowRight :size="18" :stroke-width="2" aria-hidden="true" />
       <!-- 右上角的小圆点：小名单里有几道 -->
       <span class="bubble-badge">{{ shortlist.length }}<span class="sr-only"> 道</span></span>
     </button>
@@ -370,128 +357,44 @@ function draw() {
   padding-bottom: 72px;
 }
 
-.shortlist-bubble {
-  position: fixed;
-  left: 50%;
-  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-  z-index: 10;
-  width: max-content;
-  max-width: calc(100vw - 32px);
-  padding: 11px 16px;
-  border: 3px solid #1f9e86;
-  border-radius: 999px;
-  background: var(--mint);
-  color: var(--text);
-  font-size: 0.98rem;
-  font-weight: 800;
-  white-space: nowrap;
-  box-shadow: 0 6px 18px rgba(31, 158, 134, 0.35);
-  transform: translateX(-50%);
-  animation: bubble-in 0.35s cubic-bezier(0.3, 1.6, 0.5, 1);
-}
-
-.shortlist-bubble:active {
-  transform: translateX(-50%) scale(0.96);
-}
-
-.bubble-badge {
-  position: absolute;
-  top: -10px;
-  right: -6px;
-  min-width: 24px;
-  height: 24px;
-  padding: 0 6px;
-  border: 2px solid var(--surface);
-  border-radius: 999px;
-  background: var(--pink);
-  color: var(--text);
-  font-size: 0.8rem;
-  line-height: 20px;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
-
-/* 很窄的手机上字小一点，保证一行放得下 */
-@media (max-width: 360px) {
-  .shortlist-bubble {
-    padding: 10px 12px;
-    font-size: 0.88rem;
-  }
-}
-
-.bubble-arrow {
-  display: inline-block;
-  animation: nudge 1s ease-in-out infinite;
-}
-
-@keyframes bubble-in {
-  from {
-    opacity: 0;
-    transform: translate(-50%, 30px) scale(0.8);
-  }
-}
-
-@keyframes nudge {
-  50% {
-    transform: translateX(4px);
-  }
+.prompt {
+  margin: 24px 0 0;
+  text-align: center;
+  color: var(--text-muted);
 }
 
 .mode-tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  margin-top: 18px;
-  padding: 5px;
-  border-radius: 999px;
-  background: var(--accent-soft);
+  gap: 4px;
+  margin-top: 16px;
+  padding: 4px;
+  border-radius: var(--radius);
+  background: var(--surface);
 }
 
 .mode-tab {
-  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
   padding: 6px 10px;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--radius-inner);
   background: transparent;
-  font-size: 1.02rem;
-  font-weight: 800;
   color: var(--text-muted);
-  transition: background 0.15s;
+  font-weight: 700;
 }
 
+/* 选中的模式：和选中餐次一样用浅橙底、深橙字 */
 .mode-tab.active {
-  background: var(--surface);
-  color: var(--accent-dark);
-  box-shadow: 0 3px 0 var(--border);
-}
-
-.prompt {
-  margin: 30px 0 0;
-  text-align: center;
-  color: var(--text-muted);
-  font-size: 1.05rem;
-}
-
-.point {
-  display: inline-block;
-  animation: poke 1s ease-in-out infinite;
-}
-
-@keyframes poke {
-  50% {
-    transform: translateY(-6px);
-  }
+  background: var(--accent-soft);
+  color: var(--accent-strong);
 }
 
 .action {
-  margin-top: 26px;
+  margin-top: 24px;
   text-align: center;
 }
 
@@ -499,148 +402,143 @@ function draw() {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .draw-button {
+  display: inline-flex;
   flex: 1 1 auto;
-  max-width: 300px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  max-width: 280px;
   min-width: 0;
-  padding: 14px 12px;
-  border: 3px solid var(--accent-dark);
-  border-radius: 999px;
-  background: linear-gradient(135deg, var(--accent), var(--pink));
+  min-height: 52px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--accent);
   color: var(--accent-text);
-  font-size: 1.3rem;
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  box-shadow: 0 6px 0 var(--accent-dark);
+  font-size: var(--fs-lg);
+  font-weight: 800;
   transition:
-    transform 0.1s,
-    box-shadow 0.1s,
-    opacity 0.15s;
-}
-
-.draw-button:not(:disabled) {
-  animation: breathe 2.2s ease-in-out infinite;
-}
-
-.draw-button:hover:not(:disabled) {
-  transform: translateY(-2px) rotate(-1deg);
+    transform 0.08s,
+    opacity 0.12s;
 }
 
 .draw-button:active:not(:disabled) {
-  transform: translateY(4px);
-  box-shadow: 0 2px 0 var(--accent-dark);
-  animation: none;
+  transform: translateY(1px);
 }
 
 .draw-button:disabled {
-  opacity: 0.5;
-  animation: none;
-}
-
-.btn-emoji {
-  display: inline-block;
-  margin-right: 6px;
-}
-
-.draw-button:hover:not(:disabled) .btn-emoji {
-  animation: spin 0.6s ease-in-out;
-}
-
-@keyframes breathe {
-  50% {
-    transform: scale(1.04);
-  }
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+  opacity: 0.45;
 }
 
 .candidate-count {
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   color: var(--text-muted);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 
 .outcome {
-  margin-top: 22px;
+  margin-top: 20px;
 }
 
 .empty {
+  margin: 0;
   padding: 16px;
-  border: 3px dashed var(--border);
   border-radius: var(--radius);
   background: var(--surface);
+  color: var(--text-muted);
   text-align: center;
-}
-
-.empty-emoji {
-  display: block;
-  font-size: 2.4rem;
-  line-height: 1.3;
 }
 
 .last-note {
   margin: 12px 0 0;
   color: var(--text-muted);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 
 .rolling {
-  padding: 30px 16px;
-  border: 3px dashed var(--accent);
-  border-radius: 22px;
-  background: var(--yellow-soft);
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 28px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
 
-.slot {
-  display: block;
-  font-size: 2.6rem;
-  line-height: 1.2;
-  animation: shake 0.2s linear infinite;
+.rolling-icon {
+  color: var(--accent-strong);
 }
 
 .rolling-name {
-  display: block;
-  margin-top: 4px;
-  font-size: 1.8rem;
-  font-weight: 900;
-  color: var(--accent-dark);
+  font-size: var(--fs-xl);
+  font-weight: 800;
+  color: var(--text-muted);
   overflow-wrap: anywhere;
 }
 
-@keyframes shake {
-  0%,
-  100% {
-    transform: rotate(-8deg);
-  }
-  50% {
-    transform: rotate(8deg);
-  }
-}
-
 .result-card {
-  animation: pop-in 0.35s cubic-bezier(0.3, 1.6, 0.5, 1);
+  animation: appear 0.15s ease-out;
 }
 
-@keyframes pop-in {
+@keyframes appear {
   from {
     opacity: 0;
-    transform: scale(0.8) rotate(-3deg);
   }
 }
 
-/* 很窄的手机上，吉祥物小一点，给按钮留地方 */
+.shortlist-bubble {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100vw - 32px);
+  padding: 12px 16px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--text);
+  color: #ffffff;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  transform: translateX(-50%);
+}
+
+.shortlist-bubble:active {
+  transform: translateX(-50%) translateY(1px);
+}
+
+.bubble-badge {
+  position: absolute;
+  top: -8px;
+  right: -4px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: var(--fs-sm);
+  line-height: 22px;
+  text-align: center;
+}
+
+/* 很窄的手机上：吉祥物小一点，气泡字小一点，保证一行放得下 */
 @media (max-width: 360px) {
   .button-row :deep(.mascot) {
     width: 44px;
     height: 40px;
+  }
+
+  .shortlist-bubble {
+    padding: 10px 12px;
+    font-size: var(--fs-sm);
   }
 }
 </style>

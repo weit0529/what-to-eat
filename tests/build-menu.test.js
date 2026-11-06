@@ -89,9 +89,9 @@ describe('buildMenu', () => {
       ['奶茶', ['下午茶']],
       ['馄饨', ['breakfast', 'lunch', 'dinner']],
     ])
-    // 这个测试表格是 openpyxl 写的，emoji 被存成“&#数字;”，读表格的库会读坏；应该提醒而不是显示坏字
-    expect(data.meals[3].emoji).toBeNull()
-    expect(result.warnings).toEqual([expect.objectContaining({ sheet: '餐次', row: 2, column: '图标' })])
+    // 这个测试表格还留着旧的“图标”列（2026-11-06 去掉了）：只提醒“不认识这一列”，不影响读取
+    expect(data.meals[3]).toEqual({ id: '下午茶', label: '下午茶', builtIn: false })
+    expect(result.warnings).toEqual([expect.objectContaining({ sheet: '餐次', row: 1, column: '图标' })])
   })
 
   it('没有“餐次”页时只有早、午、晚', async () => {

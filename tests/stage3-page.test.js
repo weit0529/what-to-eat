@@ -61,7 +61,11 @@ describe('额外餐次按钮（2B）', () => {
     expect(all.slice(0, 3).every((b) => !b.classes().includes('extra'))).toBe(true)
     const extra = w.findAll('.meal.extra')
     expect(extra.map((b) => b.find('.label').text())).toEqual(['下午茶', '夜宵'])
-    expect(extra.map((b) => b.find('.emoji').text())).toEqual(['🧋', '🌃'])
+    // 图标是 Tabler 的 SVG（不再是 emoji）：下午茶是杯子，夜宵是月亮和星星
+    expect(extra.map((b) => b.find('svg').classes())).toEqual([
+      expect.arrayContaining(['tabler-icon-cup']),
+      expect.arrayContaining(['tabler-icon-moon-stars']),
+    ])
     expect(extra.map((b) => b.find('.count').text())).toEqual(['1 道', '2 道'])
   })
 

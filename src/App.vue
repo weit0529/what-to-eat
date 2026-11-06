@@ -5,26 +5,26 @@
 <script setup>
 import menu from './generated/menu.json'
 import DrawPage from './components/DrawPage.vue'
+
+// Logo 放在 public/ 下，按相对路径取，发布到 GitHub Pages 的子路径也能找到
+const logoUrl = `${import.meta.env.BASE_URL}logo.png`
 </script>
 
 <template>
-  <div class="app">
-    <header class="app-header">
-      <h1>
-        <span class="title-emoji left" aria-hidden="true">🍜</span>
-        今天吃什么？
-        <span class="title-emoji right" aria-hidden="true">🤔</span>
-      </h1>
-      <p class="subtitle">选择困难？交给我！<span aria-hidden="true"> 🎲</span></p>
-    </header>
+  <!-- 顶栏占满整个宽度（深绿），下面的内容限宽居中 -->
+  <header class="app-header">
+    <h1 class="title">
+      <img class="logo" :src="logoUrl" alt="" width="40" height="40" />
+      <span>今天吃什么？</span>
+    </h1>
+  </header>
 
+  <div class="app">
     <main>
       <DrawPage :items="menu.items" :meals="menu.meals" />
     </main>
 
-    <footer class="app-footer">
-      菜单共 {{ menu.items.length }} 道<span aria-hidden="true"> · 好好吃饭 💪</span>
-    </footer>
+    <footer class="app-footer">菜单共 {{ menu.items.length }} 道</footer>
   </div>
 </template>
 
@@ -32,60 +32,39 @@ import DrawPage from './components/DrawPage.vue'
 .app {
   max-width: 560px;
   margin: 0 auto;
-  padding: 28px 16px 36px;
+  padding: 20px 16px 32px;
 }
 
+/* 顶栏：Logo 的深绿底，和 Logo 自己的底色一样，Logo 看起来融在顶栏里 */
 .app-header {
+  padding: 20px 16px;
+  background: var(--brand-dark);
+  color: var(--brand-cream);
   text-align: center;
-  margin-bottom: 22px;
 }
 
 .app-header h1 {
+  /* Logo 和标题文字垂直居中，整体在页面中间 */
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
   margin: 0;
-  font-size: 2.1rem;
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  color: var(--accent-dark);
-  /* 有点立体感的标题 */
-  text-shadow: 3px 3px 0 var(--yellow);
+  font-size: var(--fs-xl);
+  font-weight: 800;
+  line-height: 1.3;
 }
 
-.title-emoji {
-  display: inline-block;
-  text-shadow: none;
-}
-
-.title-emoji.left {
-  animation: wobble 2.4s ease-in-out infinite;
-}
-
-.title-emoji.right {
-  animation: wobble 2.4s ease-in-out 1.2s infinite;
-}
-
-@keyframes wobble {
-  0%,
-  100% {
-    transform: rotate(0);
-  }
-  25% {
-    transform: rotate(-12deg);
-  }
-  75% {
-    transform: rotate(12deg);
-  }
-}
-
-.subtitle {
-  margin: 6px 0 0;
-  color: var(--text-muted);
-  font-size: 1rem;
+.logo {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-inner);
 }
 
 .app-footer {
-  margin-top: 36px;
+  margin-top: 32px;
   text-align: center;
   color: var(--text-muted);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 </style>

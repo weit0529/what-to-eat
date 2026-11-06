@@ -1,19 +1,18 @@
 // 阶段 3：Excel “餐次”页里加的额外餐次（用户 2026-11-05 21:44 决定 2B、3A）
 import { describe, it, expect } from 'vitest'
 import { parseMenuRows, parseMealRows, formatIssue, MAX_EXTRA_MEALS } from '../src/core/menu-data.js'
-import { emojiForMeal, FALLBACK_EMOJI } from '../src/ui/food-emoji.js'
 
 const HEADER = ['品类', '店铺', '分类', '适合餐次', '标签', '人均价格', '描述', '图片', '启用']
-const MEAL_HEADER = ['餐次', '图标']
+const MEAL_HEADER = ['餐次']
 const menuRow = (meals) => ['麻辣烫', null, '火锅串串', meals, null, null, null, null, null]
 
 describe('parseMealRows', () => {
-  it('按顺序读出餐次，id 就是名字；图标是 emoji 时保留；空行跳过', () => {
-    const r = parseMealRows([MEAL_HEADER, ['下午茶', '🧋'], [], ['夜宵', null]])
+  it('按顺序读出餐次，id 就是名字；空行跳过', () => {
+    const r = parseMealRows([MEAL_HEADER, ['下午茶'], [], ['夜宵']])
     expect(r.errors).toEqual([])
     expect(r.meals).toEqual([
-      { id: '下午茶', label: '下午茶', emoji: '🧋' },
-      { id: '夜宵', label: '夜宵', emoji: null },
+      { id: '下午茶', label: '下午茶' },
+      { id: '夜宵', label: '夜宵' },
     ])
   })
 
@@ -22,34 +21,27 @@ describe('parseMealRows', () => {
     expect(parseMealRows([MEAL_HEADER])).toEqual({ meals: [], errors: [], warnings: [] })
   })
 
-  it('图标不是 emoji（比如读坏的字）或太长：提醒，改用自动配的', () => {
-    const r = parseMealRows([MEAL_HEADER, ['下午茶', '溜'], ['夜宵', '🌙🌙🌙🌙🌙']])
+  it('旧表格里的“图标”列（2026-11-06 去掉了）：只提醒“不认识这一列”，餐次照常读', () => {
+    const r = parseMealRows([['餐次', '图标'], ['下午茶', '🧋'], ['夜宵', null]])
     expect(r.errors).toEqual([])
-    expect(r.meals.map((m) => m.emoji)).toEqual([null, null])
-    expect(r.warnings.map((w) => [w.sheet, w.row, w.column])).toEqual([
-      ['餐次', 2, '图标'],
-      ['餐次', 3, '图标'],
-    ])
+    expect(r.meals.map((m) => m.id)).toEqual(['下午茶', '夜宵'])
+    expect(r.warnings).toEqual([expect.objectContaining({ sheet: '餐次', row: 1, column: '图标' })])
   })
 
-  it('名字为空、带分隔符、和固定的词重名、重复：报错，并且一个额外餐次都不生效', () => {
-    const r = parseMealRows([
-      MEAL_HEADER,
-      [null, '🧋'],
-      ['下午 茶', null],
-      ['早餐', null],
-      ['全天', null],
-      ['breakfast', null],
-      ['夜宵', null],
-      ['夜宵', null],
-    ])
-    expect(r.errors.map((e) => e.row)).toEqual([2, 3, 4, 5, 6, 8])
+  it('带分隔符、和固定的词重名、重复：报错，并且一个额外餐次都不生效', () => {
+    const r = parseMealRows([MEAL_HEADER, ['下午 茶'], ['早餐'], ['全天'], ['breakfast'], ['夜宵'], ['夜宵']])
+    expect(r.errors.map((e) => e.row)).toEqual([2, 3, 4, 5, 7])
     expect(r.errors.every((e) => e.sheet === '餐次')).toBe(true)
     expect(r.meals).toEqual([])
   })
 
+  it('有备注列时，名字空着报错', () => {
+    const r = parseMealRows([['餐次', '备注'], [null, '晚上饿了']])
+    expect(r.errors).toEqual([expect.objectContaining({ sheet: '餐次', row: 2, message: '不能为空' })])
+  })
+
   it(`最多 ${MAX_EXTRA_MEALS} 个`, () => {
-    const rows = [MEAL_HEADER, ...Array.from({ length: MAX_EXTRA_MEALS + 1 }, (_, i) => [`加餐${i}`, null])]
+    const rows = [MEAL_HEADER, ...Array.from({ length: MAX_EXTRA_MEALS + 1 }, (_, i) => [`加餐${i}`])]
     const r = parseMealRows(rows)
     expect(r.errors[0].message).toContain(`最多加 ${MAX_EXTRA_MEALS} 个`)
     expect(r.meals).toEqual([])
@@ -89,18 +81,10 @@ describe('菜单里填额外餐次', () => {
   })
 })
 
-describe('formatIssue 和 emojiForMeal', () => {
+describe('formatIssue', () => {
   it('“餐次”页的问题前面加上页名', () => {
     expect(formatIssue({ sheet: '餐次', row: 3, column: '餐次', message: '不能为空' })).toBe(
       '「餐次」页第 3 行「餐次」：不能为空',
     )
-  })
-
-  it('固定餐次用固定图标；额外餐次优先用“餐次”页填的，没填就按名字猜', () => {
-    expect(emojiForMeal({ id: 'lunch', label: '午餐', emoji: '🍕' })).toBe('🌞')
-    expect(emojiForMeal({ id: '夜宵', label: '夜宵', emoji: '🍢' })).toBe('🍢')
-    expect(emojiForMeal({ id: '夜宵', label: '夜宵', emoji: null })).toBe('🌃')
-    expect(emojiForMeal({ id: '下午茶', label: '下午茶' })).toBe('🧋')
-    expect(emojiForMeal({ id: '神秘时间', label: '神秘时间' })).toBe(FALLBACK_EMOJI)
   })
 })

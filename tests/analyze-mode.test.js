@@ -33,7 +33,7 @@ const click = (el) => el.trigger('click')
 const mealButton = (w, label) => w.findAll('.meal').find((b) => b.find('.label').text() === label)
 const modeTab = (w, mode) => w.find(`.mode-tab[data-mode="${mode}"]`)
 const tagChip = (w, tag) => w.find(`.tag-chip[data-tag="${tag}"]`)
-const categoryChip = (w, name) => w.findAll('.chip').find((b) => b.text().split(/\s+/).includes(name))
+const categoryChip = (w, name) => w.findAll('.exclude-panel .chip').find((b) => b.find('.chip-name').text() === name)
 const recommendButton = (w) => w.find('.recommend-button')
 const pickName = (w) => (w.find('.result-card .name').exists() ? w.find('.result-card .name').text() : null)
 const altNames = (w) => w.findAll('.alt-name').map((e) => e.text())
@@ -127,9 +127,10 @@ describe('推荐结果（B-01、B-03）', () => {
     await click(tagChip(w, '清淡'))
     await click(recommendButton(w))
     expect(pickName(w)).toBe('馄饨')
-    expect(w.find('.result-card .ribbon').text()).toContain('最推荐！')
+    expect(w.find('.result-card .ribbon').exists()).toBe(false) // 横幅已删（de-slop）
     // 理由按标签分组的顺序（口味在天气前面）
-    expect(reasons(w)).toEqual(['✔ 清淡', '✔ 适合下雨'])
+    expect(reasons(w)).toEqual(['清淡', '适合下雨'])
+    expect(w.findAll('.reasons li').map((li) => li.classes()[0])).toEqual(['ok', 'ok'])
     expect(altNames(w)).toEqual(['麻辣烫', '寿司'])
   })
 
@@ -151,7 +152,7 @@ describe('推荐结果（B-01、B-03）', () => {
     await w.find('.budget-input').setValue('20')
     await click(recommendButton(w))
     expect(pickName(w)).toBe('黄焖鸡')
-    expect(reasons(w)).toContain('❔ 价格未填')
+    expect(w.find('.reasons .unknown').text()).toBe('价格未填')
   })
 
   it('在预算内时理由里写“在预算内”', async () => {
@@ -160,7 +161,7 @@ describe('推荐结果（B-01、B-03）', () => {
     await w.find('.budget-input').setValue('15')
     await click(recommendButton(w))
     expect(pickName(w)).toBe('馄饨')
-    expect(reasons(w)).toContain('✔ 在预算内')
+    expect(w.find('.reasons .ok:last-child').text()).toBe('在预算内')
   })
 
   it('预算的各种写法：空、0、小数、首尾空格可以；全角数字、负号、中间空格、超长数字算填错', async () => {
@@ -200,7 +201,8 @@ describe('推荐结果（B-01、B-03）', () => {
     await click(recommendButton(w))
     expect(w.find('.notice').text()).toContain('最接近')
     expect(pickName(w)).toBe('麻辣烫')
-    expect(reasons(w)).toEqual(['✔ 辣', '✘ 缺少 汤'])
+    expect(reasons(w)).toEqual(['辣', '缺少 汤'])
+    expect(w.findAll('.reasons li').map((li) => li.classes()[0])).toEqual(['ok', 'miss'])
   })
 
   it('一个都没命中：明确提示没有，不硬推', async () => {

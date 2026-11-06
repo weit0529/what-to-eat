@@ -1,24 +1,46 @@
-/* 全站通用样式。界面只用浅色（用户 2026-11-05 要求），颜色都定义成变量，改配色只改这里 */
+/*
+  全站通用样式。取值来自 DESIGN.md（用户 2026-11-06 同意的 de-slop 方案）：
+  - 顶栏用 Logo 的深绿；页面浅灰底，分组用白块（用户 2026-11-06 选背景方案 D）
+  - 全页只有一个强调色（橙），只给主按钮和选中状态；深绿只用在顶栏
+  - 字号只有四种：28 / 18 / 15 / 13 px
+  - 圆角：卡片和面板 12px，里面的元素 8px，小标签圆头
+  - 不用渐变、波点、装饰动画；图标统一用 Tabler（见 src/ui/icons.js）
+*/
 
 :root {
-  --bg: #fff7ec;
-  --bg-dot: #ffe8cc;
+  /* 页面底色（浅灰）；面板、卡片、按钮用白色 --surface，浮在灰底上 */
+  --bg: #f5f5f4;
   --surface: #ffffff;
-  --text: #3b2a1a;
-  --text-muted: #8a7462;
-  --border: #f3dcc2;
+  /* 白块里面的小底色：标签、按下时的底色 */
+  --surface-muted: #f5f5f4;
+  /* 顶栏：取自 Logo 的深绿底和米白字（对比度约 11:1） */
+  --brand-dark: #0a4033;
+  --brand-cream: #fdf6ec;
+  --text: #1f1f1f;
+  --text-muted: #6b6b6b;
+  --border: #e7e5e4;
   --accent: #ff7a1a;
-  --accent-dark: #e85d00;
-  /* 橙粉色按钮、横幅上的文字。用深棕色，对比度约 5:1，白字只有 2.6:1 看不清（Codex 第 7 轮） */
-  --accent-text: #3b2a1a;
-  --accent-soft: #fff0dd;
-  --yellow: #ffd23f;
-  --yellow-soft: #fff6cc;
-  --pink: #ff6b9d;
-  --mint: #2ec4a6;
-  --excluded: #c9b8a6;
-  --radius: 18px;
-  --shadow: 0 6px 18px rgba(232, 93, 0, 0.12);
+  --accent-soft: #fff1e6;
+  /* 白底上的橙色文字、链接、图标用深一点的橙，对比度约 5:1（亮橙只有 2.6:1，看不清） */
+  --accent-strong: #c2410c;
+  /* 橙色按钮上的字用深色（白字对比度只有 2.6:1，用户 2026-11-05 要求） */
+  --accent-text: #1f1f1f;
+  /* 被排除 / “不要”的标签文字。不能太浅：#a8a29e 只有 2.3:1 看不清（Codex 第 15 轮）。
+     排除状态靠删除线、虚线框、叉号表达，文字颜色和次要文字一样（约 4.9:1） */
+  --excluded: #6b6b6b;
+
+  --fs-xl: 28px;
+  --fs-lg: 18px;
+  --fs-md: 15px;
+  --fs-sm: 13px;
+
+  --radius: 12px;
+  --radius-inner: 8px;
+  --radius-pill: 999px;
+
+  --icon: 20px;
+  --icon-sm: 16px;
+
   color-scheme: light;
 }
 
@@ -31,18 +53,20 @@
 body {
   margin: 0;
   font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: var(--fs-md);
   line-height: 1.6;
   color: var(--text);
-  background-color: var(--bg);
-  /* 淡淡的波点背景 */
-  background-image: radial-gradient(var(--bg-dot) 2px, transparent 2px);
-  background-size: 26px 26px;
+  background: var(--bg);
   -webkit-text-size-adjust: 100%;
 }
 
-button {
+button,
+input {
   font: inherit;
   color: inherit;
+}
+
+button {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
@@ -52,8 +76,29 @@ button:disabled {
 }
 
 :focus-visible {
-  outline: 3px solid var(--yellow);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* 图标和文字放在一起时，统一垂直居中（用户 2026-11-06：注意对齐） */
+.with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tabler-icon {
+  flex: none;
+}
+
+/* 只给读屏软件读的文字 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 /* 系统设置了“减少动画”时，所有动画都关掉 */

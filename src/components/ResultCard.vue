@@ -1,18 +1,18 @@
 <!--
-  抽中结果的卡片：图片（没有图片时显示分类 emoji）、名字、店铺、分类、人均价格、标签、描述。
-  用法：<ResultCard :item="抽中的菜" />
+  抽中结果的卡片：图片（没有图片时显示分类图标）、名字、店铺、分类、人均价格、标签、描述。
+  卡片下面的按钮（“就吃这个”等）由使用方放进默认插槽。
+  用法：<ResultCard :item="抽中的菜"> …按钮… </ResultCard>
 -->
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { emojiForCategory } from '../ui/food-emoji.js'
+import { IconMapPin } from '@tabler/icons-vue'
+import { iconForCategory } from '../ui/icons.js'
 
 const props = defineProps({
   item: { type: Object, required: true },
-  /** 卡片顶部横幅上的字 */
-  ribbon: { type: String, default: '就吃它！' },
 })
 
-/** 图片加载失败（比如文件坏了）时就不显示图片，改显示 emoji */
+/** 图片加载失败（比如文件坏了）时就不显示图片，改显示分类图标 */
 const imageFailed = ref(false)
 watch(
   () => props.item.image,
@@ -29,7 +29,7 @@ const imageUrl = computed(() =>
   props.item.image ? `${import.meta.env.BASE_URL}images/${encodeURIComponent(props.item.image)}` : null,
 )
 
-const emoji = computed(() => emojiForCategory(props.item.category))
+const categoryIcon = computed(() => iconForCategory(props.item.category))
 
 /** 人均价格：整数直接显示，有小数的保留一位 */
 const priceText = computed(() => {
@@ -41,7 +41,6 @@ const priceText = computed(() => {
 
 <template>
   <article class="result-card">
-    <p class="ribbon"><span aria-hidden="true">🎉 </span>{{ ribbon }}<span aria-hidden="true"> 🎉</span></p>
     <img
       v-if="imageUrl && !imageFailed"
       class="photo"
@@ -49,12 +48,18 @@ const priceText = computed(() => {
       :alt="item.name"
       @error="imageFailed = true"
     />
-    <div v-else class="emoji-art" aria-hidden="true">{{ emoji }}</div>
+    <div v-else class="icon-art" aria-hidden="true">
+      <component :is="categoryIcon" :size="40" :stroke-width="1.5" />
+    </div>
     <div class="body">
       <p class="category">{{ item.category }}</p>
       <h2 class="name">{{ item.name }}</h2>
-      <p v-if="item.shop" class="shop"><span aria-hidden="true">📍 </span>{{ item.shop }}</p>
-      <p v-if="priceText" class="price"><span aria-hidden="true">💰 </span>{{ priceText }}</p>
+      <p v-if="item.shop || priceText" class="meta">
+        <span v-if="item.shop" class="shop with-icon">
+          <IconMapPin :size="16" :stroke-width="1.75" aria-hidden="true" />{{ item.shop }}
+        </span>
+        <span v-if="priceText" class="price">{{ priceText }}</span>
+      </p>
       <ul v-if="item.tags.length > 0" class="tags" aria-label="标签">
         <li v-for="tag in item.tags" :key="tag">{{ tag }}</li>
       </ul>
@@ -66,22 +71,10 @@ const priceText = computed(() => {
 
 <style scoped>
 .result-card {
-  position: relative;
   overflow: hidden;
-  border: 3px solid var(--accent);
-  border-radius: 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   background: var(--surface);
-  box-shadow: 0 6px 0 var(--accent-dark);
-}
-
-.ribbon {
-  margin: 0;
-  padding: 6px 12px;
-  background: linear-gradient(90deg, var(--accent), var(--pink));
-  color: var(--accent-text);
-  font-weight: 800;
-  text-align: center;
-  letter-spacing: 0.1em;
 }
 
 .photo {
@@ -91,54 +84,53 @@ const priceText = computed(() => {
   object-fit: cover;
 }
 
-.emoji-art {
-  padding: 18px 0 4px;
-  font-size: 4.5rem;
-  line-height: 1.1;
-  text-align: center;
-  animation: spin-in 0.5s ease-out;
-}
-
-@keyframes spin-in {
-  from {
-    transform: rotate(-30deg) scale(0.4);
-    opacity: 0;
-  }
+.icon-art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  margin: 20px auto 0;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
 }
 
 .body {
-  padding: 8px 18px 20px;
+  padding: 12px 16px 20px;
   text-align: center;
 }
 
 .category {
-  display: inline-block;
   margin: 0;
-  padding: 0 10px;
-  border-radius: 999px;
-  background: var(--yellow-soft);
   color: var(--text-muted);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 
 .name {
-  margin: 4px 0 0;
-  font-size: 2rem;
-  font-weight: 900;
+  margin: 2px 0 0;
+  font-size: var(--fs-xl);
+  font-weight: 800;
   line-height: 1.3;
-  color: var(--accent-dark);
   overflow-wrap: anywhere;
 }
 
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px 16px;
+  margin: 6px 0 0;
+}
+
 .shop {
-  margin: 2px 0 0;
-  font-size: 1rem;
+  gap: 4px;
+  color: var(--text-muted);
   overflow-wrap: anywhere;
 }
 
 .price {
-  margin: 6px 0 0;
-  color: var(--accent);
   font-weight: 700;
 }
 
@@ -147,29 +139,22 @@ const priceText = computed(() => {
   flex-wrap: wrap;
   justify-content: center;
   gap: 6px;
-  margin: 10px 0 0;
+  margin: 12px 0 0;
   padding: 0;
   list-style: none;
 }
 
 .tags li {
-  padding: 1px 10px;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  font-size: 0.8rem;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
   overflow-wrap: anywhere;
 }
 
-.tags li:nth-child(3n + 2) {
-  background: #ffe3ee;
-}
-
-.tags li:nth-child(3n) {
-  background: #dcf7f1;
-}
-
 .description {
-  margin: 10px 0 0;
+  margin: 12px 0 0;
   color: var(--text-muted);
 }
 </style>

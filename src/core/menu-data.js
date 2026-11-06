@@ -149,10 +149,12 @@ function parseMeals(text, words, order) {
 
 // ---------------- 额外餐次（Excel 的“餐次”页） ----------------
 
-/** “餐次”页的列 */
+/**
+ * “餐次”页的列。只有餐次名一列；按钮上的图标按名字自动配（src/ui/icons.js）。
+ * 原来的“图标”列（填 emoji）在 2026-11-06 去掉了（用户决定不用 emoji，2A），旧表格里还有这一列也没关系，会被忽略
+ */
 export const MEAL_SHEET_COLUMNS = {
   label: { title: '餐次', required: true },
-  emoji: { title: '图标' },
 }
 
 /** “餐次”页最多加几个餐次（页面上一行放 3 个，最多两行） */
@@ -166,7 +168,7 @@ const MEAL_NAME_FORBIDDEN = /[、,，;；\s]/
  * 额外餐次的 id 就是它的名字（例如“夜宵”），和固定餐次的英文 id 不会重名。
  *
  * @param {Array<Array<any>>} rows “餐次”页的内容，第一行是列名
- * @returns {{ meals: Array<{ id: string, label: string, emoji: string | null }>,
+ * @returns {{ meals: Array<{ id: string, label: string }>,
  *             errors: object[], warnings: object[] }}
  *   错误和提醒都带 sheet: '餐次'，row 是 Excel 里的行号
  */
@@ -205,7 +207,6 @@ export function parseMealRows(rows) {
     if (isEmptyRow(row)) continue
 
     const label = cellText(cell(row, 'label'))
-    let emoji = cellText(cell(row, 'emoji')) || null
 
     if (label === '') {
       issue(errors, excelRow, '餐次', '不能为空')
@@ -225,14 +226,7 @@ export function parseMealRows(rows) {
     }
     firstRowOf.set(label, excelRow)
 
-    // 图标只要一个 emoji。不是 emoji、或者太长的，提醒并改用自动配的图标。
-    // 注意：有些工具（比如 Python 的 openpyxl）把 emoji 存成“&#数字;”，读表格的库会把它读坏成别的字，
-    // 这里也会因为“不是 emoji”而提醒，不会把读坏的字显示到网页上。用 Excel / WPS 直接填没有这个问题
-    if (emoji && (!/\p{Extended_Pictographic}/u.test(emoji) || [...emoji].length > 4)) {
-      issue(warnings, excelRow, '图标', `“${emoji}”不是一个 emoji，或者太长了。先用自动配的图标`)
-      emoji = null
-    }
-    meals.push({ id: label, label, emoji })
+    meals.push({ id: label, label })
   }
 
   if (meals.length > MAX_EXTRA_MEALS) {
