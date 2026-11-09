@@ -90,16 +90,22 @@ describe('runCloudflare', () => {
 })
 
 describe('runCloudBase', () => {
-  /** 假的云开发 SDK */
-  function fakeSdk({ signInError = null, addResult } = {}) {
-    let saved = null
+  /** 假的云开发 SDK（PG 模式：app.rdb().from(表).insert().select() / .select().eq()，返回 { data, error }） */
+  function fakeSdk({ signInError = null, insertError = null, insertData } = {}) {
+    const rows = []
     const db = {
-      collection: () => ({
-        add: async (doc) => ((saved = doc), addResult ?? { id: 'doc1' }),
-        doc: () => ({ get: async () => ({ data: saved ? [saved] : [] }) }),
+      from: () => ({
+        insert: (row) => ({
+          select: async () => {
+            if (insertError) return { data: null, error: insertError }
+            rows.push({ id: rows.length + 1, ...row })
+            return { data: insertData ?? [{ id: rows.length }], error: null }
+          },
+        }),
+        select: () => ({ eq: async (col, val) => ({ data: rows.filter((r) => r[col] === val), error: null }) }),
       }),
     }
-    const app = { auth: { signInAnonymously: async () => ({ data: {}, error: signInError }) }, database: () => db }
+    const app = { auth: { signInAnonymously: async () => ({ data: {}, error: signInError }) }, rdb: () => db }
     return async () => ({ init: () => app })
   }
 
@@ -118,9 +124,17 @@ describe('runCloudBase', () => {
     expect(results.at(-1)).toMatchObject({ name: '匿名登录', ok: false, detail: '登录方式未开启' })
   })
 
-  it('写入没返回编号时算失败（比如没有权限）', async () => {
-    const results = await runCloudBase({ env: 'env-1', loadSdk: fakeSdk({ addResult: { code: 'PERMISSION', message: '没有权限' } }) })
-    expect(results.at(-1)).toMatchObject({ name: '写一条数据', ok: false, detail: '没有权限' })
+  it('写入被权限规则拒绝时记下数据库给的说明，后面跳过', async () => {
+    const results = await runCloudBase({
+      env: 'env-1',
+      loadSdk: fakeSdk({ insertError: { message: 'new row violates row-level security policy' } }),
+    })
+    expect(results.at(-1)).toMatchObject({ name: '写一条数据', ok: false, detail: 'new row violates row-level security policy' })
+  })
+
+  it('写入成功但没返回编号时算失败', async () => {
+    const results = await runCloudBase({ env: 'env-1', loadSdk: fakeSdk({ insertData: [] }) })
+    expect(results.at(-1)).toMatchObject({ name: '写一条数据', ok: false, detail: '没有返回编号' })
   })
 
   it('没填环境 ID 时直接提示；SDK 下载失败记成失败', async () => {

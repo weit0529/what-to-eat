@@ -1,6 +1,7 @@
 // 连通测试的步骤（不碰页面，方便测试）。每一步记下：后台、步骤名、耗时（毫秒）、成功与否、说明。
 //
-// 腾讯云开发：匿名登录 → 写一条 → 读回来（要在控制台开“匿名登录”，数据库建 conn_test 集合并允许登录用户读写自己的数据）
+// 腾讯云开发（PG 模式）：匿名登录 → 写一条 → 读回来
+//   要在控制台开“匿名登录”，并在 PostgreSQL 里运行 connectivity-test/cloudbase-pg.sql 建表（每人只能读写自己的数据）
 // Cloudflare：ping ×3 → 注册随机测试账号 → 登录 → 写一条 → 读回来（注册要测试邀请码）
 
 /** 随机测试用户名和密码：t_ + 8 位随机字母数字 */
@@ -146,17 +147,19 @@ export async function runCloudBase({ env, loadSdk, now = () => performance.now()
     now,
   )
   if (!signedIn) return results
-  const db = app.database()
+  // PG 模式的 PostgreSQL：app.rdb() 拿到数据库，写法和 Supabase 一样，返回 { data, error }
+  const db = app.rdb()
   const text = `连通测试 ${new Date().toISOString()}`
-  let id = ''
+  let id = null
   const wrote = await step(
     results,
     B,
     '写一条数据',
     async () => {
-      const res = await db.collection('conn_test').add({ text, createdAt: Date.now() })
-      id = res.id || res._id
-      if (!id) throw new Error(res.message || '没有返回编号')
+      const { data, error } = await db.from('conn_test').insert({ text }).select('id')
+      if (error) throw new Error(error.message || String(error))
+      id = data?.[0]?.id ?? null
+      if (id === null) throw new Error('没有返回编号')
     },
     now,
   )
@@ -166,8 +169,9 @@ export async function runCloudBase({ env, loadSdk, now = () => performance.now()
       B,
       '读回来',
       async () => {
-        const res = await db.collection('conn_test').doc(id).get()
-        if (res.data?.[0]?.text !== text) throw new Error(res.message || '读回来的内容对不上')
+        const { data, error } = await db.from('conn_test').select('id,text').eq('id', id)
+        if (error) throw new Error(error.message || String(error))
+        if (data?.[0]?.text !== text) throw new Error('读回来的内容对不上')
       },
       now,
     )
