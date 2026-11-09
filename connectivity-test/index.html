@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- 阶段 4-1 连通测试页，不在正式网站的任何地方出现链接，只发给测试的朋友 -->
+    <meta name="robots" content="noindex" />
+    <title>连通测试 · 今天吃什么？</title>
+  </head>
+  <body>
+    <main class="page">
+      <h1>连通测试</h1>
+      <p class="hint">
+        帮忙测一下两家后台在你的手机网络上快不快。点下面的按钮，等一会儿，再点“复制结果”发给我就行。
+        测试会建一个随机的测试账号、写一条测试数据，不会用到你的任何个人信息。
+      </p>
+
+      <section class="block">
+        <label class="field">
+          <span>测试邀请码（链接里带了就不用填）</span>
+          <input id="invite" autocomplete="off" />
+        </label>
+        <button id="run" class="primary" type="button">开始测试</button>
+        <p id="status" class="hint" role="status"></p>
+      </section>
+
+      <section class="block">
+        <h2>结果</h2>
+        <table>
+          <thead>
+            <tr><th>后台</th><th>步骤</th><th>耗时</th><th>结果</th></tr>
+          </thead>
+          <tbody id="results"></tbody>
+        </table>
+        <button id="copy" type="button" disabled>复制结果</button>
+        <!-- 手机浏览器不让自动复制时，结果放在这里，长按选中复制（Codex 第 23 轮） -->
+        <textarea id="report" class="report" rows="8" readonly hidden aria-label="测试结果文字"></textarea>
+      </section>
+
+      <details class="block">
+        <summary>账号功能测试（管理员用，朋友不用管）</summary>
+        <p class="hint">验证腾讯云开发能不能“邮箱验证码注册 + 用户名 + 密码”，以及用邮箱验证码重置密码（REQUIREMENTS.md R-022）。</p>
+        <label class="field"><span>用户名</span><input id="acc-username" autocomplete="off" /></label>
+        <label class="field"><span>邮箱</span><input id="acc-email" type="email" autocomplete="off" /></label>
+        <label class="field"><span>密码（8 位以上）</span><input id="acc-password" type="password" autocomplete="new-password" /></label>
+        <div class="row">
+          <button id="acc-signup" type="button">1. 发注册验证码</button>
+          <label class="field inline"><span>验证码</span><input id="acc-code" inputmode="numeric" autocomplete="one-time-code" /></label>
+          <button id="acc-verify" type="button">2. 完成注册</button>
+        </div>
+        <div class="row">
+          <button id="acc-login" type="button">3. 用户名 + 密码登录</button>
+        </div>
+        <div class="row">
+          <button id="acc-reset" type="button">4. 发重置密码验证码</button>
+          <label class="field inline"><span>验证码</span><input id="acc-reset-code" inputmode="numeric" autocomplete="one-time-code" /></label>
+          <label class="field inline"><span>新密码</span><input id="acc-new-password" type="password" autocomplete="new-password" /></label>
+          <button id="acc-reset-done" type="button">5. 改密码</button>
+        </div>
+        <pre id="acc-log" class="log" aria-live="polite"></pre>
+      </details>
+    </main>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

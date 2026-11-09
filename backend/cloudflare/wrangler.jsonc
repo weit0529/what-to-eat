@@ -1,0 +1,28 @@
+// 备用后台（Cloudflare Workers + D1）的配置。阶段 4-1 连通测试用。
+// 本机运行：npm run cf:dev（数据库存在本机 .wrangler 文件夹里，不碰线上）
+// 部署前要做的（用户自己的 Cloudflare 账号）：
+//   1. npx wrangler login
+//   2. npx wrangler d1 create what-to-eat-test，把输出的 database_id 填到下面
+//   3. npx wrangler d1 migrations apply what-to-eat-test --remote
+//   4. npx wrangler secret put TEST_INVITE（输入测试邀请码，发给测试的朋友）
+//   5. npm run cf:deploy
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "what-to-eat-test",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-11-01",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "what-to-eat-test",
+      // 部署前换成 wrangler d1 create 输出的 id；本机运行不需要
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    // 允许调用的网页：正式网站（GitHub Pages）和本机开发地址
+    "ALLOWED_ORIGINS": "https://weit0529.github.io,http://localhost:5173"
+  },
+  "observability": { "enabled": true }
+}

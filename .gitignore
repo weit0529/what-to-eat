@@ -27,3 +27,7 @@ Thumbs.db
 .vscode/
 .idea/
 .claude/
+
+# Cloudflare 本机运行产生的数据库和缓存；本机用的测试邀请码（.dev.vars）不上传
+.wrangler/
+.dev.vars
