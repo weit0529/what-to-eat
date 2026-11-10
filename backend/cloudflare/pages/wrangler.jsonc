@@ -1,0 +1,24 @@
+// 同一份测试后台，部署到 Cloudflare Pages（网址 *.pages.dev），给大陆用户连通测试用。
+// workers.dev 的网址在大陆连不上（用户 2026-11-10 实测）。数据库、邀请码和 Workers 版共用。
+// 部署（在本文件所在的文件夹运行）：
+//   npx wrangler pages project create what-to-eat-api --production-branch main   （只第一次）
+//   npx wrangler pages deploy
+//   npx wrangler pages secret put TEST_INVITE --project-name what-to-eat-api     （只第一次）
+{
+  "$schema": "../../../node_modules/wrangler/config-schema.json",
+  "name": "what-to-eat-api",
+  "pages_build_output_dir": "./public",
+  "compatibility_date": "2026-11-01",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "what-to-eat-test",
+      // 和 Workers 版共用同一个 D1（建在亚太区域）
+      "database_id": "d7b7815d-9b29-406b-8555-73df3af3685e"
+    }
+  ],
+  "vars": {
+    // 允许调用的网页：正式网站（GitHub Pages）和本机开发地址
+    "ALLOWED_ORIGINS": "https://weit0529.github.io,http://localhost:5173"
+  }
+}

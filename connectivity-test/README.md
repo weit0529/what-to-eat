@@ -36,7 +36,19 @@ npx wrangler secret put TEST_INVITE --config backend/cloudflare/wrangler.jsonc
 npm run cf:deploy
 ```
 
-`secret put` 时输入一个测试邀请码（自己定，比如一串随机字母）。部署完会输出 `https://what-to-eat-test.<你的子域名>.workers.dev`，填进 `connectivity-test/config.js` 的 `cloudflareApi`。
+`secret put` 时输入一个测试邀请码（自己定，比如一串随机字母）。
+
+**workers.dev 的网址在大陆连不上**（用户 2026-11-10 实测），所以同一个后台再部署到 Cloudflare Pages，用 `https://what-to-eat-api.pages.dev`（已填进 `connectivity-test/config.js` 的 `cloudflareApi`）。Pages 版和上面的 Workers 版共用同一个数据库：
+
+```bash
+cd backend/cloudflare/pages
+npx wrangler pages project create what-to-eat-api --production-branch main --force
+npx wrangler pages secret put TEST_INVITE --project-name what-to-eat-api
+cd ../../..
+npm run cf:pages:deploy
+```
+
+第一条只在第一次运行；`--force` 是让 wrangler 建传统的 Pages 项目（网址是 pages.dev），不加的话新版 wrangler 会转成 Workers，网址又变回 workers.dev。以后改了后台代码，只运行最后一条。
 
 ## 三、发给朋友
 

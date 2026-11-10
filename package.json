@@ -19,7 +19,8 @@
     "test:watch": "vitest",
     "cf:migrate:local": "wrangler d1 migrations apply what-to-eat-test --local --config backend/cloudflare/wrangler.jsonc",
     "cf:dev": "wrangler dev --config backend/cloudflare/wrangler.jsonc --port 8787",
-    "cf:deploy": "wrangler deploy --config backend/cloudflare/wrangler.jsonc"
+    "cf:deploy": "wrangler deploy --config backend/cloudflare/wrangler.jsonc",
+    "cf:pages:deploy": "cd backend/cloudflare/pages && wrangler pages deploy --commit-dirty=true"
   },
   "dependencies": {
     "@cloudbase/js-sdk": "3.11.0",
