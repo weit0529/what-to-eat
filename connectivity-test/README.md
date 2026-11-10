@@ -3,7 +3,11 @@
 用来比较两家后台在大陆手机网络上的速度和稳定性，选出主方案（REQUIREMENTS.md R-019）。
 测试页发布在正式网站的 `/connectivity-test/` 下，网站里没有链接，只发给测试的朋友。
 
-## 一、腾讯云开发（主方案）要在控制台做的设置
+**现在的顺序（用户 2026-11-09 决定）：先只测 Cloudflare（第二部分）。** 腾讯云网页调用需要的“跨域设置”在免费版上要收费，暂时不测；
+`config.js` 里 `cloudbaseEnv` 留空时，测试页的腾讯云一行显示“本次不测”，不算失败。
+Cloudflare 在大陆稳定，就用它当主方案；不稳定，再看清腾讯云的收费说明、确认个人版（19.9 元/月）能配跨域后升级，再按第一部分测腾讯云。
+
+## 一、腾讯云开发要在控制台做的设置（暂缓，等 Cloudflare 测完再定）
 
 新建环境时数据库选 **PostgreSQL**（PG 模式，用户 2026-11-09 决定）。然后由账号主人（大陆朋友）或协作者在云开发控制台操作：
 
@@ -11,17 +15,17 @@
    - 打开“匿名登录”（连通测试用，测完可以关掉）
    - 打开“用户名密码登录”
    - 打开“邮箱登录”，发件邮箱填专用 QQ / 163 邮箱：SMTP 服务器 `smtp.qq.com` 或 `smtp.163.com`，端口 465，密码填邮箱的“授权码”（授权码只填在控制台，不要发给别人）
-2. **安全配置 → Web 安全域名**：加上 `weit0529.github.io` 和 `localhost:5173`
+2. **允许网页调用（跨域设置）**：官方文档写明“浏览器端调用必须配置安全来源”。新版控制台已把“安全来源”并进「HTTP 网关」（旧名“HTTP 访问服务”）的「跨域设置」，打开 `https://tcb.cloud.tencent.com/dev#/env/safety-source` 也会跳到这里。加两条：`weit0529.github.io`、`localhost:5173`（不带 `https://`，本机地址要带端口）。**注意：免费版在这里添加要收费**（用户 2026-11-09 实际看到）；付费前先把收费说明截图发来，确认是哪种收费、个人版能不能配
 3. **PostgreSQL 数据库**：打开 SQL 编辑器，把 `connectivity-test/cloudbase-pg.sql` 整段粘贴进去运行一次。它会建 `conn_test` 表，并设好“登录了的人（包括匿名登录）才能用、每人只能读写自己的数据，只拿公开密钥没登录的请求一律不行”
 4. 把“环境 ID”填进 `connectivity-test/config.js` 的 `cloudbaseEnv`
 
-## 二、Cloudflare（备用方案）要做的设置
+## 二、Cloudflare 要做的设置（现在先测这个）
 
 在项目文件夹里运行（第 1 步会打开浏览器让你登录自己的 Cloudflare 账号）：
 
 ```bash
 npx wrangler login
-npx wrangler d1 create what-to-eat-test
+npx wrangler d1 create what-to-eat-test --location apac
 ```
 
 把第二条命令输出的 `database_id` 填进 `backend/cloudflare/wrangler.jsonc`，然后：

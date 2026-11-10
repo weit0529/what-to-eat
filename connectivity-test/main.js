@@ -34,8 +34,13 @@ $('run').addEventListener('click', async () => {
   lastResults = []
   render(lastResults)
   try {
-    $('status').textContent = '正在测腾讯云……'
-    lastResults.push(...(await runCloudBase({ env: config.cloudbaseEnv, loadSdk })))
+    if (config.cloudbaseEnv) {
+      $('status').textContent = '正在测腾讯云……'
+      lastResults.push(...(await runCloudBase({ env: config.cloudbaseEnv, loadSdk })))
+    } else {
+      // 先只测 Cloudflare（用户 2026-11-09 决定）：没配腾讯云时不算失败，免得朋友以为出错了
+      lastResults.push({ backend: '腾讯云', name: '本次不测', ms: 0, ok: true, detail: '这次只测 Cloudflare' })
+    }
     render(lastResults)
     $('status').textContent = '正在测 Cloudflare……'
     lastResults.push(...(await runCloudflare({ base: config.cloudflareApi, invite: $('invite').value.trim() })))

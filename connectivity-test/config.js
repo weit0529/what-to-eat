@@ -7,7 +7,7 @@
 // # 后面的内容不会随打开网页发给服务器；点“开始测试”时，邀请码只会发给上面写死的 Cloudflare 后台。
 export const CONFIG = {
   cloudbaseEnv: '',
-  cloudflareApi: '',
+  cloudflareApi: 'https://what-to-eat-test.wt040529.workers.dev',
 }
 
 /** 页面是不是开在本机（开发调试） */
