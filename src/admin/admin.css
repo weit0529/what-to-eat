@@ -283,3 +283,22 @@ button:disabled {
 .preview {
   margin-top: 12px;
 }
+
+.new-invite {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: var(--radius-inner);
+  background: var(--accent-soft);
+}
+
+.new-invite .code {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: var(--fs-lg);
+  letter-spacing: 2px;
+}
+
+.link-text {
+  margin: 6px 0;
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}

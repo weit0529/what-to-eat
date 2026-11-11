@@ -16,7 +16,7 @@
 //   POST   /api/admin/bootstrap    还没有任何管理员时，凭 BOOTSTRAP_TOKEN 建第一个管理员（建好后这个接口就没用了）
 
 import { MEALS, validateDish, validateExtraMeals } from '../../../src/core/menu-data.js'
-import { USERNAME_RE } from './auth-setup.js'
+import { isAllowedEmail, USERNAME_RE } from './auth-setup.js'
 import { randomHex } from './auth.js'
 import { json, readJson, TOO_LARGE } from './http.js'
 
@@ -250,7 +250,7 @@ async function createAdmin(auth, body, reply) {
   const email = typeof body?.email === 'string' ? body.email.trim() : ''
   const password = typeof body?.password === 'string' ? body.password : ''
   if (!USERNAME_RE.test(username)) return reply({ error: '用户名要 2～20 个字，只能用中文、英文字母、数字、下划线' }, 400)
-  if (!/^[^\s@]{1,64}@[^\s@]{1,255}\.[^\s@]{1,63}$/.test(email)) return reply({ error: '邮箱格式不对' }, 400)
+  if (!isAllowedEmail(email)) return reply({ error: '邮箱格式不对' }, 400)
   if (password.length < 8 || password.length > 64) return reply({ error: '密码要 8～64 位' }, 400)
   try {
     const { user } = await auth.api.createUser({

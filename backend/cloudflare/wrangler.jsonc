@@ -11,6 +11,8 @@
   "name": "what-to-eat-test",
   "main": "src/worker.js",
   "compatibility_date": "2026-11-01",
+  // 发邮件的库 worker-mailer 要用（阶段 4-3）
+  "compatibility_flags": ["nodejs_compat"],
   "d1_databases": [
     {
       "binding": "DB",
@@ -24,7 +26,11 @@
     // 允许调用的网页：正式网站（GitHub Pages）和本机开发地址
     "ALLOWED_ORIGINS": "https://weit0529.github.io,http://localhost:5173",
     // 后台自己的网址（登录库 Better Auth 要用）
-    "AUTH_BASE_URL": "https://what-to-eat-test.wt040529.workers.dev"
+    "AUTH_BASE_URL": "https://what-to-eat-test.wt040529.workers.dev",
+    // 发验证码邮件（阶段 4-3）：发信服务器。发信邮箱 SMTP_USER 和授权码 SMTP_PASS 是 secret，
+    // 不写在这里（这个文件会公开到 GitHub，邮箱地址也不公开）
+    "SMTP_HOST": "smtp.qq.com",
+    "SMTP_PORT": "465"
   },
   "observability": { "enabled": true }
 }

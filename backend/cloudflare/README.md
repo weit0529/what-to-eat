@@ -8,6 +8,8 @@
 | `src/worker.js` | 入口：按网址分给下面几部分 |
 | `src/auth-setup.js` | 登录（现成库 Better Auth：用户名 + 密码、管理员角色、凭证放请求头、登录次数限制） |
 | `src/menu-api.js` | 菜单：网站读菜单（公开）；管理员增删改、导入、餐次、管理员名单 |
+| `src/account-api.js` | 普通用户注册（邀请码 + 邮箱验证码）、管理员的邀请码 |
+| `src/mailer.js` | 发验证码邮件（worker-mailer 连 QQ 邮箱 SMTP） |
 | `src/connectivity.js` | 阶段 4-1 连通测试用的接口（测试页 `/connectivity-test/` 在用） |
 | `src/auth.js` | 密码加密（PBKDF2）等小工具 |
 | `src/http.js` | JSON 响应、跨域头、限长读请求体 |
@@ -23,6 +25,10 @@
 | `BETTER_AUTH_SECRET` | secret | 登录用的密钥，随机 64 位十六进制；**换了它所有人都要重新登录** |
 | `BOOTSTRAP_TOKEN` | secret | 建第一个管理员用的一次性口令；建好后可以删掉 |
 | `TEST_INVITE` | secret | 连通测试的邀请码 |
+| `SMTP_HOST` / `SMTP_PORT` | `wrangler.jsonc` | 发信服务器，smtp.qq.com、465 |
+| `SMTP_USER` | secret | 发信邮箱地址（不写进公开的代码） |
+| `SMTP_PASS` | secret | 邮箱的“授权码”（在 QQ 邮箱设置里开 SMTP 后拿到；用户自己存，不经过别人） |
+| `MAIL_MODE` | 只在本机 `.dev.vars` | 写 `log` 时邮件只打印在 wrangler dev 的输出里，不真发 |
 
 ## 部署（在项目根目录运行）
 
@@ -36,6 +42,13 @@ npm run cf:pages:deploy
 ```bash
 npx wrangler pages secret put BETTER_AUTH_SECRET --project-name what-to-eat-api
 npx wrangler pages secret put BOOTSTRAP_TOKEN --project-name what-to-eat-api
+```
+
+发验证码邮件还要两个 secret（同样在 `backend/cloudflare/pages` 文件夹里运行，按提示输入；授权码只由邮箱主人自己输入）：
+
+```bash
+npx wrangler pages secret put SMTP_USER --project-name what-to-eat-api
+npx wrangler pages secret put SMTP_PASS --project-name what-to-eat-api
 ```
 
 设完 secret 要再部署一次才生效。然后建第一个管理员（见 `scripts/create-first-admin.mjs`），其他管理员在管理页里加。

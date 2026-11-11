@@ -33,6 +33,19 @@ const pageKey = ref(0)
 // Logo 放在 public/ 下，按相对路径取，发布到 GitHub Pages 的子路径也能找到
 const logoUrl = `${import.meta.env.BASE_URL}logo.png`
 
+// 页面底部的账号入口（阶段 4-3，用户 2026-11-10 选 4A）：登录过就显示“我的账号（名字）”，没登录显示“登录 / 注册”。
+// 只看本机有没有存登录凭证，不为这个去连后台
+const accountUrl = `${import.meta.env.BASE_URL}account/`
+function readSignedInName() {
+  try {
+    if (!localStorage.getItem('what-to-eat:user-token:v1')) return ''
+    return localStorage.getItem('what-to-eat:user-name:v1') || '已登录'
+  } catch {
+    return ''
+  }
+}
+const signedInName = readSignedInName()
+
 /** 两份菜单内容是否一样（餐次和菜都一样） */
 const sameMenu = (a, b) => JSON.stringify([a.meals, a.items]) === JSON.stringify([b.meals, b.items])
 
@@ -71,7 +84,11 @@ onMounted(async () => {
       （会重新开始这一次的选择）
     </p>
 
-    <footer class="app-footer">菜单共 {{ menu.items.length }} 道</footer>
+    <footer class="app-footer">
+      <span>菜单共 {{ menu.items.length }} 道</span>
+      <span aria-hidden="true"> · </span>
+      <a class="account-link" :href="accountUrl">{{ signedInName ? `我的账号（${signedInName}）` : '登录 / 注册' }}</a>
+    </footer>
   </div>
 </template>
 
@@ -124,6 +141,11 @@ onMounted(async () => {
   font-size: var(--fs-sm);
   font-weight: 700;
   text-decoration: underline;
+}
+
+.account-link {
+  color: var(--accent-strong);
+  font-weight: 700;
 }
 
 .app-footer {

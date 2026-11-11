@@ -28,6 +28,7 @@
     "better-auth": "1.7.18",
     "read-excel-file": "^9.3.14",
     "vue": "^3.5.44",
+    "worker-mailer": "1.3.1",
     "write-excel-file": "4.1.1"
   },
   "devDependencies": {

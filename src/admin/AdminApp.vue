@@ -1,6 +1,6 @@
 <!--
   管理页（阶段 4-2，网址 /admin/，正式网站上没有入口链接，用户 2026-11-10 选 3A）。
-  先登录（只有管理员能用），然后分几块：菜单、餐次、Excel 导入导出、管理员、改密码。
+  先登录（只有管理员能用），然后分几块：菜单、餐次、Excel 导入导出、邀请码（4-3）、管理员、改密码。
   菜单数据在这里读一次，各块改完后通知这里重新读。
 -->
 <script setup>
@@ -11,11 +11,13 @@ import DishesView from './DishesView.vue'
 import MealsView from './MealsView.vue'
 import ExcelView from './ExcelView.vue'
 import AdminsView from './AdminsView.vue'
+import InvitesView from './InvitesView.vue'
 
 const TABS = [
   { id: 'dishes', label: '菜单' },
   { id: 'meals', label: '餐次' },
   { id: 'excel', label: 'Excel' },
+  { id: 'invites', label: '邀请码' },
   { id: 'admins', label: '管理员和密码' },
 ]
 
@@ -102,6 +104,7 @@ onMounted(async () => {
         <MealsView v-else-if="tab === 'meals'" :menu="menu" @changed="loadMenu" />
         <ExcelView v-else-if="tab === 'excel'" :menu="menu" @changed="loadMenu" />
       </template>
+      <InvitesView v-if="tab === 'invites'" />
       <AdminsView v-if="tab === 'admins'" />
     </template>
   </main>

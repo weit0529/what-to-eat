@@ -10,7 +10,8 @@ export default defineConfig({
 
   plugins: [vue()],
 
-  // 三个页面：正式网站；阶段 4-1 的连通测试页（/connectivity-test/）；阶段 4-2 的管理页（/admin/）。后两个网站里都没有链接
+  // 四个页面：正式网站；连通测试页（/connectivity-test/，4-1）；管理页（/admin/，4-2）；账号页（/account/，4-3）。
+  // 只有账号页在正式网站底部有入口
   build: {
     // 腾讯云 SDK 单独一个文件约 855KB（压缩传输约 211KB），只在用到时才下载，不影响首页；提高提醒阈值免得每次构建都报
     chunkSizeWarningLimit: 900,
@@ -19,6 +20,7 @@ export default defineConfig({
         main: fileURLToPath(new URL('./index.html', import.meta.url)),
         connectivity: fileURLToPath(new URL('./connectivity-test/index.html', import.meta.url)),
         admin: fileURLToPath(new URL('./admin/index.html', import.meta.url)),
+        account: fileURLToPath(new URL('./account/index.html', import.meta.url)),
       },
     },
   },
