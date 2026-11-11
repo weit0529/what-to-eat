@@ -34,7 +34,11 @@ jobs:
 
       - run: npm test
 
+      # 构建前从后台取一份最新菜单打包进网站，后台连不上时网站用它兜底（用户 2026-11-10 选 5A）；
+      # 取不到就退回用 data/menu.xlsx，发布照常进行（见 scripts/prepare-menu.js）
       - run: npm run build
+        env:
+          MENU_API_URL: https://what-to-eat-api.pages.dev/api/menu
 
       - uses: actions/configure-pages@v6
 

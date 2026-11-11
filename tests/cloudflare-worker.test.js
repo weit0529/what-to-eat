@@ -1,30 +1,9 @@
 // @vitest-environment node
 // 备用后台（backend/cloudflare）的测试：用 Node 自带的 SQLite 模拟 D1 数据库，直接调用 handle()
 import { describe, it, expect, beforeEach } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { DatabaseSync } from 'node:sqlite'
 import { handle } from '../backend/cloudflare/src/worker.js'
 import { hashPassword, validateCredentials, verifyPassword } from '../backend/cloudflare/src/auth.js'
-
-/** 和 D1 一样的接口：prepare(sql).bind(...).first() / run() / all() */
-function fakeD1() {
-  const db = new DatabaseSync(':memory:')
-  for (const f of ['0001_init.sql', '0002_login_failures.sql']) {
-    db.exec(readFileSync(new URL(`../backend/cloudflare/migrations/${f}`, import.meta.url), 'utf8'))
-  }
-  return {
-    prepare(sql) {
-      let args = []
-      const stmt = {
-        bind: (...a) => ((args = a), stmt),
-        first: async () => db.prepare(sql).get(...args) ?? null,
-        run: async () => db.prepare(sql).run(...args),
-        all: async () => ({ results: db.prepare(sql).all(...args) }),
-      }
-      return stmt
-    },
-  }
-}
+import { fakeD1 } from './helpers/fake-d1.js'
 
 const ORIGIN = 'https://weit0529.github.io'
 let env

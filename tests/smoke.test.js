@@ -6,7 +6,7 @@ import App from '../src/App.vue'
 
 describe('开发环境', () => {
   it('根组件能渲染出标题', () => {
-    const wrapper = mount(App)
+    const wrapper = mount(App, { props: { remote: false } })
     expect(wrapper.find('h1').text()).toContain('今天吃什么？')
   })
 })

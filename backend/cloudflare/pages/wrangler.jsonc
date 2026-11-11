@@ -19,6 +19,8 @@
   ],
   "vars": {
     // 允许调用的网页：正式网站（GitHub Pages）和本机开发地址
-    "ALLOWED_ORIGINS": "https://weit0529.github.io,http://localhost:5173"
+    "ALLOWED_ORIGINS": "https://weit0529.github.io,http://localhost:5173",
+    // 后台自己的网址（登录库 Better Auth 要用）
+    "AUTH_BASE_URL": "https://what-to-eat-api.pages.dev"
   }
 }

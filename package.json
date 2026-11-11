@@ -8,7 +8,7 @@
     "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
   },
   "scripts": {
-    "menu": "node scripts/build-menu.js",
+    "menu": "node scripts/prepare-menu.js",
     "predev": "npm run menu",
     "dev": "vite",
     "prebuild": "npm run menu",
@@ -25,14 +25,16 @@
   "dependencies": {
     "@cloudbase/js-sdk": "3.11.0",
     "@tabler/icons-vue": "^3.50.0",
-    "vue": "^3.5.44"
+    "better-auth": "1.7.18",
+    "read-excel-file": "^9.3.14",
+    "vue": "^3.5.44",
+    "write-excel-file": "4.1.1"
   },
   "devDependencies": {
     "@cloudbase/cli": "3.9.1",
     "@vitejs/plugin-vue": "^6.0.10",
     "@vue/test-utils": "^2.5.1",
     "jsdom": "^30.1.3",
-    "read-excel-file": "^9.3.14",
     "vite": "^8.3.5",
     "vitest": "^5.1.0",
     "wrangler": "4.158.0"

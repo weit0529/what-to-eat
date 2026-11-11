@@ -309,6 +309,8 @@ function checkImage(fileName, imageFiles) {
 export function parseMenuRows(rows, options = {}) {
   const imageFiles = options.imageFiles ?? null
   const extraMeals = options.extraMeals ?? []
+  // 管理页导入 Excel 时要连停用的菜一起导进后台（后台保留停用的菜，只是不显示），每道菜带 enabled
+  const includeDisabled = options.includeDisabled === true
   // 认得的餐次词：固定的词 + 额外餐次的名字。“全天”只含早、午、晚（用户 2026-11-05 决定 3A）
   const mealWords = new Map(MEAL_WORDS)
   extraMeals.forEach((meal) => mealWords.set(meal.label, [meal.id]))
@@ -387,7 +389,7 @@ export function parseMenuRows(rows, options = {}) {
 
     if (!enabled.enabled) {
       disabledCount++
-      continue
+      if (!includeDisabled) continue
     }
 
     const image = checkImage(cellText(cell(row, 'image')), imageFiles)
@@ -395,7 +397,7 @@ export function parseMenuRows(rows, options = {}) {
 
     const description = cellText(cell(row, 'description'))
 
-    items.push({
+    const item = {
       id,
       name,
       shop: shop || null,
@@ -410,10 +412,12 @@ export function parseMenuRows(rows, options = {}) {
       source: 'admin',
       owner: null,
       status: 'approved',
-    })
+    }
+    if (includeDisabled) item.enabled = enabled.enabled
+    items.push(item)
   }
 
-  if (errors.length === 0 && items.length === 0) {
+  if (errors.length === 0 && items.filter((item) => item.enabled !== false).length === 0) {
     errors.push({
       row: 1,
       message: disabledCount > 0 ? '所有菜都填了“启用：否”，网站上就没有菜可选了' : '表格里还没有菜',
@@ -431,4 +435,115 @@ export function formatIssue(issue) {
   const sheet = issue.sheet ? `「${issue.sheet}」页` : ''
   const where = issue.column ? `${sheet}第 ${issue.row} 行「${issue.column}」` : `${sheet}第 ${issue.row} 行`
   return `${where}：${issue.message}`
+}
+
+// ---------------- 后台和管理页共用的检查（阶段 4-2） ----------------
+// 管理页在线改菜时，网页先用它检查一遍给管理员看；后台收到后再用同一套规则检查一遍，
+// 不能只靠网页拦（别人可以绕过网页直接调后台）。
+
+/** 每一项最长多少字 */
+export const DISH_LIMITS = { name: 40, shop: 40, category: 20, tag: 20, tags: 20, description: 200, image: 100, price: 100000 }
+
+const isText = (value) => typeof value === 'string'
+const textLength = (value) => [...value].length
+
+/**
+ * 检查并整理一道菜（管理页提交的 JSON）。
+ * @param {object} input 管理页提交的菜：name、shop、category、meals、tags、price、description、image、enabled
+ * @param {{ mealIds: string[] }} context 现在有效的餐次 id（早午晚 + 额外餐次）
+ * @returns {{ dish: object | null, errors: Array<{ field: string, message: string }> }}
+ *   dish 是整理好的菜（去掉首尾空格、空的变 null）；有错误时 dish 为 null
+ */
+export function validateDish(input, { mealIds }) {
+  const errors = []
+  const add = (field, message) => errors.push({ field, message })
+  const src = input && typeof input === 'object' ? input : {}
+
+  const optionalText = (field, max) => {
+    const value = src[field]
+    if (value === null || value === undefined || value === '') return null
+    if (!isText(value)) {
+      add(field, '格式不对')
+      return null
+    }
+    const text = squeeze(value.trim())
+    if (textLength(text) > max) add(field, `最多 ${max} 个字`)
+    return text === '' ? null : text
+  }
+
+  const name = optionalText('name', DISH_LIMITS.name)
+  if (!name) add('name', '品类不能为空')
+  const shop = optionalText('shop', DISH_LIMITS.shop)
+  const category = optionalText('category', DISH_LIMITS.category)
+  if (!category) add('category', '分类不能为空')
+  else if (LIST_SEPARATOR.test(category)) add('category', '只能填一个分类')
+
+  let meals = []
+  if (!Array.isArray(src.meals) || src.meals.some((id) => !isText(id))) add('meals', '格式不对')
+  else {
+    const unknown = src.meals.filter((id) => !mealIds.includes(id))
+    if (unknown.length > 0) add('meals', `没有这个餐次：${unknown.join('、')}`)
+    meals = mealIds.filter((id) => src.meals.includes(id))
+    if (meals.length === 0 && unknown.length === 0) add('meals', '至少选一个餐次')
+  }
+
+  let tags = []
+  if (src.tags !== undefined && src.tags !== null) {
+    if (!Array.isArray(src.tags) || src.tags.some((tag) => !isText(tag))) add('tags', '格式不对')
+    else {
+      tags = [...new Set(src.tags.map((tag) => tag.trim()).filter(Boolean))]
+      if (tags.length > DISH_LIMITS.tags) add('tags', `最多 ${DISH_LIMITS.tags} 个标签`)
+      if (tags.some((tag) => textLength(tag) > DISH_LIMITS.tag)) add('tags', `每个标签最多 ${DISH_LIMITS.tag} 个字`)
+      if (tags.some((tag) => LIST_SEPARATOR.test(tag))) add('tags', '一个标签里不能有顿号、逗号、分号或换行')
+    }
+  }
+
+  let price = null
+  if (src.price !== undefined && src.price !== null && src.price !== '') {
+    if (typeof src.price !== 'number' || !Number.isFinite(src.price) || src.price < 0) add('price', '人均价格要填 0 或正数')
+    else if (src.price > DISH_LIMITS.price) add('price', `人均价格太大（最多 ${DISH_LIMITS.price}）`)
+    else price = src.price
+  }
+
+  const description = optionalText('description', DISH_LIMITS.description)
+
+  let image = null
+  const imageText = optionalText('image', DISH_LIMITS.image)
+  if (imageText) {
+    const checked = checkImage(imageText, null)
+    if (checked.warning) add('image', checked.warning)
+    else image = checked.image
+  }
+
+  if (src.enabled !== undefined && typeof src.enabled !== 'boolean') add('enabled', '格式不对')
+  const enabled = src.enabled !== false
+
+  if (errors.length > 0) return { dish: null, errors }
+  return { dish: { name, shop, category, meals, tags, price, description, image, enabled }, errors }
+}
+
+/**
+ * 检查额外餐次（管理页的“餐次”设置）：规则和 Excel“餐次”页一样。
+ * @param {unknown} labels 额外餐次的名字，按顺序
+ * @returns {{ meals: Array<{ id: string, label: string }>, errors: string[] }}
+ */
+export function validateExtraMeals(labels) {
+  const errors = []
+  if (!Array.isArray(labels) || labels.some((label) => !isText(label))) return { meals: [], errors: ['格式不对'] }
+  const meals = []
+  const seen = new Set()
+  for (const raw of labels) {
+    const label = raw.trim()
+    if (label === '') continue
+    if (MEAL_NAME_FORBIDDEN.test(label)) errors.push(`“${label}”：名字里不能有顿号、逗号、分号或空格`)
+    else if (MEAL_WORDS.has(label) || ALL_MEAL_IDS.includes(label)) errors.push(`“${label}”：和早餐、午餐、晚餐、全天这些固定的词重了`)
+    else if (textLength(label) > 10) errors.push(`“${label}”：最多 10 个字`)
+    else if (seen.has(label)) errors.push(`“${label}”：重复了`)
+    else {
+      seen.add(label)
+      meals.push({ id: label, label })
+    }
+  }
+  if (meals.length > MAX_EXTRA_MEALS) errors.push(`最多加 ${MAX_EXTRA_MEALS} 个餐次，现在有 ${meals.length} 个`)
+  return { meals: errors.length > 0 ? [] : meals, errors }
 }

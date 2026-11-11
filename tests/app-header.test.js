@@ -5,7 +5,7 @@ import App from '../src/App.vue'
 
 describe('App 标题', () => {
   it('标题旁显示 Logo，Logo 是装饰图，读屏只读标题文字', () => {
-    const w = mount(App)
+    const w = mount(App, { props: { remote: false } })
     const logo = w.find('.app-header img.logo')
     expect(logo.exists()).toBe(true)
     expect(logo.attributes('src').endsWith('logo.png')).toBe(true)

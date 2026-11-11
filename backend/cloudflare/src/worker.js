@@ -1,123 +1,55 @@
-// 备用后台（Cloudflare Workers + D1）：阶段 4-1 连通测试用（REQUIREMENTS.md R-019）。
+// 后台入口（Cloudflare Pages 的 _worker.js 和 Workers 版都用它）：按网址把请求分给各部分处理。
 //
-// 接口（都返回 JSON，每个响应都带 serverMs = 后台自己花的毫秒数，用来和总耗时对比出网络耗时）：
-//   GET  /api/ping                     不碰数据库，测纯网络往返
-//   POST /api/register {username, password, invite}   注册测试账号（要测试邀请码，防止陌生人乱注册）
-//   POST /api/login    {username, password, invite}    登录，返回 token（同一个用户名 15 分钟内输错 10 次就暂停）
-//   POST /api/notes    {text}   （要登录）写一条数据
-//   GET  /api/notes             （要登录）读自己最近 5 条
+//   /api/auth/*     登录（Better Auth，见 auth-setup.js）
+//   /api/menu       网站读菜单（公开）
+//   /api/admin/*    管理员管菜单、管理员名单（见 menu-api.js）
+//   /api/ping 等    阶段 4-1 连通测试（见 connectivity.js）
 //
 // 环境变量（wrangler.jsonc / wrangler secret）：
-//   DB               D1 数据库
-//   TEST_INVITE      测试邀请码（secret，不写进代码）
-//   ALLOWED_ORIGINS  允许调用的网页地址，逗号分隔（如 GitHub Pages 和本机开发地址）
+//   DB                 D1 数据库
+//   ALLOWED_ORIGINS    允许调用的网页地址，逗号分隔（GitHub Pages 和本机开发地址）
+//   AUTH_BASE_URL      后台自己的网址（Better Auth 要用）
+//   BETTER_AUTH_SECRET 登录用的密钥（secret，不写进代码）
+//   BOOTSTRAP_TOKEN    建第一个管理员用的一次性口令（secret；建好后可以删掉）
+//   TEST_INVITE        连通测试的邀请码（secret）
 
-import { hashPassword, hashToken, randomHex, validateCredentials, verifyPassword } from './auth.js'
+import { createAuth } from './auth-setup.js'
+import { connectivityRoute } from './connectivity.js'
+import { corsHeaders, json, readBody, TOO_LARGE } from './http.js'
+import { menuRoute } from './menu-api.js'
 
-/** 登录凭证有效期：7 天 */
-const SESSION_MS = 7 * 24 * 60 * 60 * 1000
-/** 测试数据一条最长多少字 */
-const NOTE_MAX = 200
-/** 请求体最大字节数：这些接口的正常请求都远小于它，超了直接拒绝，不浪费计算 */
-const BODY_MAX_BYTES = 2048
-/** 登录失败限制：同一个用户名在这段时间内最多输错几次 */
-const LOGIN_FAIL_LIMIT = 10
-const LOGIN_FAIL_WINDOW_MS = 15 * 60 * 1000
-
-/** 带耗时和跨域头的 JSON 响应 */
-function json(body, status, started, cors) {
-  return new Response(JSON.stringify({ ...body, serverMs: Date.now() - started }), {
-    status,
-    headers: { 'content-type': 'application/json; charset=utf-8', ...cors },
-  })
-}
-
-/** 只给允许的网页地址返回跨域头；其他来源的浏览器请求会被浏览器拦下 */
-function corsHeaders(request, env) {
-  const origin = request.headers.get('origin')
-  const allowed = (env.ALLOWED_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean)
-  if (!origin || !allowed.includes(origin)) return {}
-  return {
-    'access-control-allow-origin': origin,
-    'access-control-allow-methods': 'GET, POST, OPTIONS',
-    'access-control-allow-headers': 'content-type, authorization',
-    'access-control-max-age': '86400',
-    vary: 'origin',
-  }
-}
-
-/** 请求体太大时 readJson 返回它（没写 content-length 头的请求也要拦住） */
-const TOO_LARGE = Symbol('too-large')
+/** 请求体的总上限（导入整份菜单最大 512KB，其他接口在各自的地方再限得更小） */
+const BODY_MAX_BYTES = 512 * 1024
+/** 登录接口的请求体上限 */
+const AUTH_BODY_MAX_BYTES = 16 * 1024
 
 /**
- * 读 JSON 请求体；太大返回 TOO_LARGE，不是 JSON 返回 null。
- * 一块一块地读并累计字节数，一超过上限就停止读取、取消剩下的部分，
- * 不会把很大的请求整个读进内存（Codex 第 24 轮）。
+ * 只开放管理页真正用到的登录接口（Codex 第 28 轮）。Better Auth 默认还带邮箱登录、改角色、建用户等接口：
+ * 邮箱登录会绕过用户名登录的 15 分钟限次；改角色能把最后一个管理员降级。这些一律不开放，
+ * 建管理员、删管理员走我们自己的 /api/admin/admins（有“至少留一个、不能删自己”的保护）。
  */
-async function readJson(request) {
-  if (!request.body) return null
-  const reader = request.body.getReader()
-  const chunks = []
-  let total = 0
-  try {
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
-      total += value.byteLength
-      if (total > BODY_MAX_BYTES) {
-        await reader.cancel().catch(() => {})
-        return TOO_LARGE
-      }
-      chunks.push(value)
-    }
-  } catch {
-    return null
+const AUTH_ROUTES = new Set([
+  'POST /api/auth/sign-in/username',
+  'POST /api/auth/sign-out',
+  'GET /api/auth/get-session',
+  'POST /api/auth/change-password',
+])
+
+/** 给 Better Auth 的响应加上跨域头（保留它自己设的 Access-Control-Expose-Headers） */
+function withCors(response, cors) {
+  const headers = new Headers(response.headers)
+  for (const [key, value] of Object.entries(cors)) {
+    if (key === 'access-control-expose-headers' && headers.has(key)) continue
+    headers.set(key, value)
   }
-  const bytes = new Uint8Array(total)
-  let offset = 0
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset)
-    offset += chunk.byteLength
-  }
-  try {
-    return JSON.parse(new TextDecoder().decode(bytes))
-  } catch {
-    return null
-  }
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
 }
 
-/** 这个用户名现在是不是因为输错太多次被暂停了 */
-async function loginLocked(env, username, now) {
-  const row = await env.DB.prepare('SELECT count, window_start FROM login_failures WHERE username = ?').bind(username).first()
-  return Boolean(row && now - row.window_start < LOGIN_FAIL_WINDOW_MS && row.count >= LOGIN_FAIL_LIMIT)
-}
-
-/** 记一次登录失败；上一个时间窗口过了就从 1 重新数 */
-async function recordLoginFailure(env, username, now) {
-  await env.DB.prepare(
-    `INSERT INTO login_failures (username, count, window_start) VALUES (?1, 1, ?2)
-     ON CONFLICT(username) DO UPDATE SET
-       count = CASE WHEN ?2 - window_start >= ?3 THEN 1 ELSE count + 1 END,
-       window_start = CASE WHEN ?2 - window_start >= ?3 THEN ?2 ELSE window_start END`,
-  )
-    .bind(username, now, LOGIN_FAIL_WINDOW_MS)
-    .run()
-}
-
-/** 从 Authorization: Bearer <token> 找到当前用户；没登录或过期返回 null */
-async function currentUser(request, env, now) {
-  const header = request.headers.get('authorization') || ''
-  const token = header.startsWith('Bearer ') ? header.slice(7) : ''
-  if (!token) return null
-  const row = await env.DB.prepare('SELECT user_id, expires_at FROM sessions WHERE token_hash = ?')
-    .bind(await hashToken(token))
-    .first()
-  if (!row || row.expires_at <= now) return null
-  return row.user_id
-}
-
-/** 处理一个请求（单独导出，测试里可以直接调用） */
-export async function handle(request, env, now = Date.now()) {
+/**
+ * 处理一个请求（单独导出，测试里可以直接调用）。
+ * @param {{ authOptions?: object }} [opts] 测试里可以把 PBKDF2 次数调小
+ */
+export async function handle(request, env, now = Date.now(), opts = {}) {
   const started = Date.now()
   const cors = corsHeaders(request, env)
   const url = new URL(request.url)
@@ -128,76 +60,28 @@ export async function handle(request, env, now = Date.now()) {
     return json({ error: '请求太大' }, 413, started, cors)
   }
 
+  let auth = null
+  const getAuth = () => (auth ||= createAuth(env, opts.authOptions))
+
   try {
-    if (route === 'GET /api/ping') return json({ ok: true }, 200, started, cors)
+    const test = await connectivityRoute(route, request, env, now, started, cors)
+    if (test) return test
 
-    if (route === 'POST /api/register') {
-      const body = await readJson(request)
-      if (body === TOO_LARGE) return json({ error: '请求太大' }, 413, started, cors)
-      if (!env.TEST_INVITE || body?.invite !== env.TEST_INVITE) return json({ error: '邀请码不对' }, 403, started, cors)
-      const problem = validateCredentials(body.username, body.password)
-      if (problem) return json({ error: problem }, 400, started, cors)
-      const exists = await env.DB.prepare('SELECT 1 FROM users WHERE username = ?').bind(body.username).first()
-      if (exists) return json({ error: '这个用户名已经有人用了' }, 409, started, cors)
-      const pw = await hashPassword(body.password)
-      await env.DB.prepare(
-        'INSERT INTO users (username, pw_salt, pw_hash, pw_iterations, created_at) VALUES (?, ?, ?, ?, ?)',
-      )
-        .bind(body.username, pw.salt, pw.hash, pw.iterations, now)
-        .run()
-      return json({ ok: true }, 201, started, cors)
-    }
-
-    if (route === 'POST /api/login') {
-      const body = await readJson(request)
-      if (body === TOO_LARGE) return json({ error: '请求太大' }, 413, started, cors)
-      // 测试后台登录也要邀请码：没有邀请码的人连猜密码的机会都没有（Codex 第 23 轮）
-      if (!env.TEST_INVITE || body?.invite !== env.TEST_INVITE) return json({ error: '邀请码不对' }, 403, started, cors)
-      const username = typeof body.username === 'string' ? body.username : ''
-      if (!username || username.length > 20) return json({ error: '用户名或密码不对' }, 401, started, cors)
-      if (await loginLocked(env, username, now)) {
-        return json({ error: '输错太多次，请 15 分钟后再试' }, 429, started, cors)
-      }
-      const user = await env.DB.prepare('SELECT id, pw_salt, pw_hash, pw_iterations FROM users WHERE username = ?')
-        .bind(username)
-        .first()
-      // 密码格式不对（如超过 64 位）直接算错，不做加密计算
-      const ok =
-        user &&
-        typeof body.password === 'string' &&
-        body.password.length <= 64 &&
-        (await verifyPassword(body.password, { salt: user.pw_salt, hash: user.pw_hash, iterations: user.pw_iterations }))
-      // 用户名不存在和密码错用同一句话，不告诉别人哪个用户名存在
-      if (!ok) {
-        await recordLoginFailure(env, username, now)
-        return json({ error: '用户名或密码不对' }, 401, started, cors)
-      }
-      await env.DB.prepare('DELETE FROM login_failures WHERE username = ?').bind(username).run()
-      const token = randomHex(32)
-      await env.DB.prepare('INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)')
-        .bind(await hashToken(token), user.id, now + SESSION_MS)
-        .run()
-      return json({ ok: true, token }, 200, started, cors)
-    }
-
-    if (route === 'POST /api/notes' || route === 'GET /api/notes') {
-      const userId = await currentUser(request, env, now)
-      if (!userId) return json({ error: '请先登录' }, 401, started, cors)
-      if (request.method === 'POST') {
-        const body = await readJson(request)
+    if (url.pathname.startsWith('/api/auth/')) {
+      if (!AUTH_ROUTES.has(route)) return json({ error: '没有这个接口' }, 404, started, cors)
+      // 先限长读出请求体，再交给 Better Auth（它会整个读进内存）
+      let forward = request
+      if (request.method !== 'GET' && request.method !== 'HEAD') {
+        const body = await readBody(request, AUTH_BODY_MAX_BYTES)
         if (body === TOO_LARGE) return json({ error: '请求太大' }, 413, started, cors)
-        const text = typeof body?.text === 'string' ? body.text.trim().slice(0, NOTE_MAX) : ''
-        if (!text) return json({ error: '内容不能为空' }, 400, started, cors)
-        await env.DB.prepare('INSERT INTO notes (user_id, text, created_at) VALUES (?, ?, ?)').bind(userId, text, now).run()
-        return json({ ok: true }, 201, started, cors)
+        if (body === null) return json({ error: '请求读不出来' }, 400, started, cors)
+        forward = new Request(request.url, { method: request.method, headers: request.headers, body })
       }
-      const { results } = await env.DB.prepare(
-        'SELECT id, text, created_at FROM notes WHERE user_id = ? ORDER BY id DESC LIMIT 5',
-      )
-        .bind(userId)
-        .all()
-      return json({ ok: true, notes: results }, 200, started, cors)
+      return withCors(await getAuth().handler(forward), cors)
     }
+
+    const menu = await menuRoute(request.method, url.pathname, request, env, getAuth, now, started, cors)
+    if (menu) return menu
 
     return json({ error: '没有这个接口' }, 404, started, cors)
   } catch (err) {
