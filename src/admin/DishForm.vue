@@ -1,6 +1,7 @@
 <!--
   加 / 改一道菜的表单。提交前先用和后台同一套规则（validateDish）检查一遍，有错直接在对应的格子下面说明；
   后台还会再检查一次（不能只靠网页拦），后台说有错也显示在这里。
+  账号页“我的菜”（阶段 4-4）也用它：不显示图片（上传在 4-4d）和“启用”两项。
 -->
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
@@ -17,6 +18,12 @@ const props = defineProps({
   /** 后台返回的错误 [{ field, message }] */
   serverErrors: { type: Array, default: () => [] },
   busy: { type: Boolean, default: false },
+  /** 显示“图片”一项（账号页先不显示） */
+  showImage: { type: Boolean, default: true },
+  /** 显示“启用”一项（用户的菜没有启用 / 暂停） */
+  showEnabled: { type: Boolean, default: true },
+  /** 标题；不传就按新加 / 修改自动写 */
+  title: { type: String, default: '' },
 })
 const emit = defineEmits(['save', 'cancel'])
 
@@ -79,7 +86,7 @@ function submit() {
 
 <template>
   <form class="block dish-form" @submit.prevent="submit">
-    <h2>{{ dish ? `改：${dish.name}` : '新加一道菜' }}</h2>
+    <h2>{{ title || (dish ? `改：${dish.name}` : '新加一道菜') }}</h2>
 
     <div class="grid">
       <label class="field">
@@ -127,7 +134,7 @@ function submit() {
       <small v-if="errorOf('description')" class="error">{{ errorOf('description') }}</small>
     </label>
 
-    <label class="field">
+    <label v-if="showImage" class="field">
       <span>图片</span>
       <select v-model="form.image">
         <option value="">不用图片</option>
@@ -139,7 +146,7 @@ function submit() {
       <small v-if="errorOf('image')" class="error">{{ errorOf('image') }}</small>
     </label>
 
-    <label class="check">
+    <label v-if="showEnabled" class="check">
       <input v-model="form.enabled" type="checkbox" />启用（不勾就暂停：网站上不显示，但留着）
     </label>
 

@@ -346,7 +346,7 @@ describe('Codex 第 28 轮的修复', () => {
     const b = (await call('POST', '/api/admin/dishes', { body: { ...DISH, name: '烧烤', enabled: false }, token })).data.dish
     const pause = await call('PUT', `/api/admin/dishes/${a.id}`, { body: { ...DISH, enabled: false }, token })
     expect(pause.status).toBe(409)
-    expect(pause.data.error).toContain('至少要留一道启用的菜')
+    expect(pause.data.error).toContain('至少要留一道启用的通用菜')
     expect((await call('DELETE', `/api/admin/dishes/${a.id}`, { token })).status).toBe(409)
     // 改别的项（不停用）照样可以
     expect((await call('PUT', `/api/admin/dishes/${a.id}`, { body: { ...DISH, price: 30 }, token })).status).toBe(200)

@@ -1,12 +1,14 @@
 <!--
   账号页（阶段 4-3，网址 /account/；入口在正式网站页面底部，用户 2026-11-10 选 4A）。
   没登录：登录 / 注册（邀请码 + 邮箱验证码，R-022）/ 忘记密码（邮箱验证码重置）。
-  登录后：看自己的用户名和邮箱、改密码、退出。“我的菜单”“吃过的记录跟着账号走”在 4-4、4-5 再做。
+  登录后两个页签：“我的菜”（阶段 4-4，加菜、提交审核，见 MyDishesView.vue）和“我的账号”（用户名、邮箱、改密码、退出）。
+  “吃过的记录跟着账号走”在 4-5 再做。
   注册链接可以带邀请码：/account/#invite=邀请码（# 后面的内容不会发给任何服务器）。
 -->
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
 import { changePassword, currentUser, register, requestReset, resetPassword, sendSignupCode, signIn, signOut, tokenSaveFailed } from './api.js'
+import MyDishesView from './MyDishesView.vue'
 
 const homeUrl = new URL('../', window.location.href).href
 const inviteFromLink = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('invite') || ''
@@ -15,6 +17,8 @@ const user = ref(null)
 const checking = ref(true)
 /** 没登录时显示哪一块：login / register / reset */
 const view = ref(inviteFromLink ? 'register' : 'login')
+/** 登录后显示哪一块：dishes（我的菜）/ account（我的账号） */
+const signedInView = ref('dishes')
 const busy = ref(false)
 const error = ref('')
 const message = ref('')
@@ -138,11 +142,19 @@ onMounted(async () => {
   <main class="admin-main account">
     <p v-if="checking" class="hint">正在检查登录……</p>
 
-    <section v-else-if="user" class="block">
+    <template v-else-if="user">
+    <nav class="tabs" aria-label="我的菜、我的账号">
+      <button type="button" class="tab" :class="{ active: signedInView === 'dishes' }" :aria-pressed="signedInView === 'dishes'" @click="signedInView = 'dishes'">我的菜</button>
+      <button type="button" class="tab" :class="{ active: signedInView === 'account' }" :aria-pressed="signedInView === 'account'" @click="signedInView = 'account'">我的账号</button>
+    </nav>
+
+    <MyDishesView v-if="signedInView === 'dishes'" />
+
+    <section v-else class="block">
       <h2>我的账号</h2>
       <p>用户名：<strong>{{ user.displayUsername || user.username || user.name }}</strong></p>
       <p>邮箱：{{ user.email }}</p>
-      <p class="hint">“我的菜单”和“吃过的记录跟着账号走”还在做，做好后会出现在这里。</p>
+      <p class="hint">“吃过的记录跟着账号走”还在做，做好后会出现在这里。</p>
       <p v-if="tokenSaveFailed" class="hint">这个浏览器不让保存登录状态（可能是无痕模式），关掉或刷新页面后要重新登录。</p>
       <div class="actions">
         <a class="button-link" :href="homeUrl">回首页</a>
@@ -157,6 +169,7 @@ onMounted(async () => {
         <button type="submit" class="primary" :disabled="busy">改密码</button>
       </form>
     </section>
+    </template>
 
     <template v-else>
       <nav class="tabs" aria-label="登录、注册、找回密码">
@@ -170,7 +183,7 @@ onMounted(async () => {
         <label class="field"><span>用户名</span><input v-model="login.username" autocomplete="username" required /></label>
         <label class="field"><span>密码</span><input v-model="login.password" type="password" autocomplete="current-password" required /></label>
         <button type="submit" class="primary" :disabled="busy">{{ busy ? '正在登录……' : '登录' }}</button>
-        <p class="hint">不登录也能随机抽、帮我分析。登录以后，以后会多出“我的菜单”等功能。</p>
+        <p class="hint">不登录也能随机抽、帮我分析。登录以后可以加自己的菜，还能抽到大家提交、管理员审核过的菜。</p>
       </form>
 
       <form v-else-if="view === 'register'" class="block" @submit.prevent="doRegister">

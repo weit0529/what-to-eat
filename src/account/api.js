@@ -56,3 +56,16 @@ export async function resetPassword(email, otp, password, opts) {
     throw err
   }
 }
+
+// ---- 我的菜（阶段 4-4，R-024、R-029） ----
+
+/** 我的菜、我提交且已通过的菜、我现在能不能加改菜 */
+export const listMyDishes = (opts) => request('/api/my/dishes', opts).then((r) => r.data)
+/** 内部菜单（通用 + 共享 + 我的）：加菜表单要用里面的餐次和已有的分类 */
+export const myMenu = (opts) => request('/api/my/menu', opts).then((r) => r.data)
+export const addMyDish = (dish, opts) => request('/api/my/dishes', { method: 'POST', body: dish, ...opts }).then((r) => r.data.dish)
+export const updateMyDish = (id, dish, opts) =>
+  request(`/api/my/dishes/${encodeURIComponent(id)}`, { method: 'PUT', body: dish, ...opts }).then((r) => r.data.dish)
+export const deleteMyDish = (id, opts) => request(`/api/my/dishes/${encodeURIComponent(id)}`, { method: 'DELETE', ...opts })
+export const submitMyDish = (id, opts) =>
+  request(`/api/my/dishes/${encodeURIComponent(id)}/submit`, { method: 'POST', ...opts }).then((r) => r.data.dish)

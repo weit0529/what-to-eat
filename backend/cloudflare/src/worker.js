@@ -20,6 +20,7 @@ import { connectivityRoute } from './connectivity.js'
 import { corsHeaders, json, readBody, TOO_LARGE } from './http.js'
 import { accountRoute } from './account-api.js'
 import { menuRoute } from './menu-api.js'
+import { myMenuRoute } from './my-menu-api.js'
 import { releaseQuotas, resetIpLimits, resetLimits, takeQuotas } from './send-limits.js'
 
 /** 请求体的总上限（导入整份菜单最大 512KB，其他接口在各自的地方再限得更小） */
@@ -143,6 +144,10 @@ export async function handle(request, env, now = Date.now(), opts = {}) {
 
     const account = await accountRoute(request.method, url.pathname, request, env, getAuth, now, started, cors)
     if (account) return account
+
+    // 我的菜单、审核、加菜权限要在 menuRoute 前面：menuRoute 把不认识的 /api/admin/ 接口都回 404
+    const myMenu = await myMenuRoute(request.method, url.pathname, request, env, getAuth, now, started, cors)
+    if (myMenu) return myMenu
 
     const menu = await menuRoute(request.method, url.pathname, request, env, getAuth, now, started, cors)
     if (menu) return menu

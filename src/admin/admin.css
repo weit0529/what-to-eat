@@ -224,6 +224,12 @@ button:disabled {
   font-size: var(--fs-sm);
 }
 
+/* 共享菜（用户提交、审核通过）：浅绿底，和通用菜单的菜分得开 */
+.badge.shared {
+  background: #e3efe8;
+  color: var(--brand-dark);
+}
+
 .dish-list,
 .meal-list,
 .admin-list,

@@ -9,6 +9,8 @@
 | `src/auth-setup.js` | 登录（现成库 Better Auth：用户名 + 密码、管理员角色、凭证放请求头、登录次数限制） |
 | `src/menu-api.js` | 菜单：网站读菜单（公开）；管理员增删改、导入、餐次、管理员名单 |
 | `src/account-api.js` | 普通用户注册（邀请码 + 邮箱验证码）、管理员的邀请码 |
+| `src/my-menu-api.js` | 我的菜单（登录用户加菜、提交审核）、管理员审核、共享菜移到通用菜单、加菜总开关和黑白名单 |
+| `src/send-limits.js` | 发信和改菜的次数限制（判断和占用在一条 SQL 里） |
 | `src/mailer.js` | 发验证码邮件（worker-mailer 连 QQ 邮箱 SMTP） |
 | `src/connectivity.js` | 阶段 4-1 连通测试用的接口（测试页 `/connectivity-test/` 在用） |
 | `src/auth.js` | 密码加密（PBKDF2）等小工具 |

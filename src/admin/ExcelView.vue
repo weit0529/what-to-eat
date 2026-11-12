@@ -30,7 +30,8 @@ const enabledInPreview = computed(() => preview.value?.dishes.filter((d) => d.en
 async function exportExcel() {
   error.value = ''
   try {
-    const sheets = menuToSheets(props.menu)
+    // 只导出通用菜单（阶段 4-4）：导入也只替换通用菜单，共享菜不进表格，免得再导入时和它们重名
+    const sheets = menuToSheets({ ...props.menu, dishes: props.menu.dishes.filter((d) => (d.scope ?? 'general') === 'general') })
     const date = new Date().toISOString().slice(0, 10)
     await writeXlsxFile(sheets.map((s) => ({ data: s.data, sheet: s.sheet, stickyRowsCount: 1 }))).toFile(`今天吃什么-菜单-${date}.xlsx`)
   } catch (err) {
@@ -56,7 +57,7 @@ async function pickFile(event) {
 async function confirmImport() {
   const p = preview.value
   if (!p?.ok) return
-  if (!window.confirm(`用这个表格整个替换线上菜单？\n共 ${p.dishes.length} 道菜（启用 ${enabledInPreview.value} 道）。\n表格里没有的菜会被删掉。建议先点“导出”留一份备份。`)) return
+  if (!window.confirm(`用这个表格整个替换线上的通用菜单（共享菜不动）？\n共 ${p.dishes.length} 道菜（启用 ${enabledInPreview.value} 道）。\n表格里没有的菜会被删掉。建议先点“导出”留一份备份。`)) return
   busy.value = true
   error.value = ''
   problems.value = []
@@ -78,13 +79,18 @@ async function confirmImport() {
 <template>
   <section class="block">
     <h2>导出</h2>
-    <p class="hint">把线上菜单存成 Excel 表格（格式和原来的 menu.xlsx 一样，按“菜单填写说明”就能改）。导入前最好先导出一份备份。</p>
+    <p class="hint">
+      把线上的通用菜单存成 Excel 表格（格式和原来的 menu.xlsx 一样，按“菜单填写说明”就能改）。导入前最好先导出一份备份。
+      用户提交的共享菜不在表格里，在“菜单”页管。
+    </p>
     <button type="button" @click="exportExcel">导出 Excel</button>
   </section>
 
   <section class="block">
     <h2>导入</h2>
-    <p class="hint">选一个表格，先检查；检查通过后再确认。<strong>导入会整个替换线上菜单</strong>，表格里没有的菜会被删掉。</p>
+    <p class="hint">
+      选一个表格，先检查；检查通过后再确认。<strong>导入会整个替换线上的通用菜单</strong>，表格里没有的菜会被删掉；共享菜不受影响。
+    </p>
     <input ref="fileInput" type="file" accept=".xlsx" aria-label="选择 Excel 表格" @change="pickFile" />
 
     <div v-if="preview" class="preview">

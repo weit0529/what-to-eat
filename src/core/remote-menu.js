@@ -29,13 +29,16 @@ export function isValidMenu(data) {
 }
 
 /**
- * 从后台取菜单。成功返回 { menu }，失败返回 { menu: null, reason }，不会抛错。
- * @param {string} url  后台的 /api/menu 地址
+ * 从后台取菜单。成功返回 { menu }，失败返回 { menu: null, reason, status }，不会抛错。
+ * @param {string} url  后台的 /api/menu 地址；登录用户用 /api/my/menu（阶段 4-4）
+ * @param {{ token?: string }} opts  登录凭证（读登录用户的内部菜单时带上）
  */
-export async function fetchMenu(url, { fetchImpl = fetch, timeoutMs = 8000 } = {}) {
+export async function fetchMenu(url, { fetchImpl = fetch, timeoutMs = 8000, token = '' } = {}) {
   try {
-    const res = await fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs) })
-    if (!res.ok) return { menu: null, reason: `后台返回 HTTP ${res.status}` }
+    const init = { signal: AbortSignal.timeout(timeoutMs) }
+    if (token) init.headers = { authorization: `Bearer ${token}` }
+    const res = await fetchImpl(url, init)
+    if (!res.ok) return { menu: null, reason: `后台返回 HTTP ${res.status}`, status: res.status }
     const data = await res.json()
     if (!isValidMenu(data)) return { menu: null, reason: '后台返回的菜单格式不对，或者一道菜都没有' }
     return { menu: { version: data.version, meals: data.meals, items: data.items }, reason: '' }

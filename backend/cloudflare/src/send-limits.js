@@ -91,3 +91,9 @@ export const resetLimits = (email) => [
   { key: `reset-email:${email}`, windowMs: DAY, max: 5 },
   { key: 'reset-total', windowMs: DAY, max: DAILY_TOTAL },
 ]
+
+/**
+ * 用户改动“我的菜”的频率（阶段 4-4，R-029）：数量不限，但每人每分钟最多改动 30 次，防止有人用脚本刷。
+ * 加、改、删、提交审核都算一次，不退还
+ */
+export const dishEditLimits = (userId) => [{ key: `dish-edit:${userId}`, windowMs: MINUTE, max: 30 }]

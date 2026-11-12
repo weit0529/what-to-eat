@@ -1,25 +1,30 @@
 <!--
   管理页（阶段 4-2，网址 /admin/，正式网站上没有入口链接，用户 2026-11-10 选 3A）。
-  先登录（只有管理员能用），然后分几块：菜单、餐次、Excel 导入导出、邀请码（4-3）、管理员、改密码。
+  先登录（只有管理员能用），然后分几块：菜单、审核和加菜权限（4-4）、餐次、Excel 导入导出、邀请码（4-3）、管理员、改密码。
   菜单数据在这里读一次，各块改完后通知这里重新读。
 -->
 <script setup>
-import { onMounted, ref } from 'vue'
-import { currentUser, getMenu, signOut, tokenSaveFailed } from './api.js'
+import { computed, onMounted, ref } from 'vue'
+import { currentUser, getMenu, listReviews, signOut, tokenSaveFailed } from './api.js'
 import LoginView from './LoginView.vue'
 import DishesView from './DishesView.vue'
 import MealsView from './MealsView.vue'
 import ExcelView from './ExcelView.vue'
 import AdminsView from './AdminsView.vue'
 import InvitesView from './InvitesView.vue'
+import ReviewsView from './ReviewsView.vue'
+import AccessView from './AccessView.vue'
 
-const TABS = [
+const reviewCount = ref(0)
+const TABS = computed(() => [
   { id: 'dishes', label: '菜单' },
+  { id: 'reviews', label: reviewCount.value > 0 ? `审核（${reviewCount.value}）` : '审核' },
+  { id: 'access', label: '加菜权限' },
   { id: 'meals', label: '餐次' },
   { id: 'excel', label: 'Excel' },
   { id: 'invites', label: '邀请码' },
   { id: 'admins', label: '管理员和密码' },
-]
+])
 
 const user = ref(null)
 const checking = ref(true)
@@ -37,9 +42,23 @@ async function loadMenu() {
   }
 }
 
+/** 待审核的有几道（标在“审核”页签上）；读不到就不标 */
+async function loadReviewCount() {
+  try {
+    reviewCount.value = (await listReviews()).length
+  } catch {
+    reviewCount.value = 0
+  }
+}
+
+/** 审核完：菜单（多了共享菜）和待审核数都要重新读 */
+async function onReviewed() {
+  await Promise.all([loadMenu(), loadReviewCount()])
+}
+
 async function onSignedIn(signedInUser) {
   user.value = signedInUser
-  if (signedInUser?.role === 'admin') await loadMenu()
+  if (signedInUser?.role === 'admin') await Promise.all([loadMenu(), loadReviewCount()])
 }
 
 async function onSignOut() {
@@ -101,9 +120,11 @@ onMounted(async () => {
 
       <template v-if="menu">
         <DishesView v-if="tab === 'dishes'" :menu="menu" @changed="loadMenu" />
+        <ReviewsView v-else-if="tab === 'reviews'" :menu="menu" @changed="onReviewed" />
         <MealsView v-else-if="tab === 'meals'" :menu="menu" @changed="loadMenu" />
         <ExcelView v-else-if="tab === 'excel'" :menu="menu" @changed="loadMenu" />
       </template>
+      <AccessView v-if="tab === 'access'" />
       <InvitesView v-if="tab === 'invites'" />
       <AdminsView v-if="tab === 'admins'" />
     </template>

@@ -4,7 +4,7 @@
 -->
 <script setup>
 import { computed, ref } from 'vue'
-import { createDish, deleteDish, updateDish } from './api.js'
+import { createDish, deleteDish, promoteDish, updateDish } from './api.js'
 import DishForm from './DishForm.vue'
 
 const props = defineProps({
@@ -14,6 +14,8 @@ const props = defineProps({
 const emit = defineEmits(['changed'])
 
 const query = ref('')
+/** 看哪一层：all 全部 / general 通用菜单 / shared 共享菜（阶段 4-4） */
+const scope = ref('all')
 /** 正在编辑的菜：null = 没在编辑；'new' = 新加；否则是那道菜 */
 const editing = ref(null)
 const busy = ref(false)
@@ -24,11 +26,13 @@ const serverErrors = ref([])
 const mealLabel = computed(() => new Map(props.menu.meals.map((m) => [m.id, m.label])))
 const categories = computed(() => [...new Set(props.menu.dishes.map((d) => d.category))])
 const enabledCount = computed(() => props.menu.dishes.filter((d) => d.enabled).length)
+const sharedCount = computed(() => props.menu.dishes.filter((d) => d.scope === 'shared').length)
 
 const shown = computed(() => {
   const q = query.value.trim().toLowerCase()
-  if (!q) return props.menu.dishes
-  return props.menu.dishes.filter((d) =>
+  const inScope = props.menu.dishes.filter((d) => scope.value === 'all' || (d.scope ?? 'general') === scope.value)
+  if (!q) return inScope
+  return inScope.filter((d) =>
     [d.name, d.shop, d.category, ...d.tags].some((text) => text && text.toLowerCase().includes(q)),
   )
 })
@@ -72,6 +76,13 @@ function toggle(dish) {
   return run(() => updateDish(dish.id, { ...dish, enabled: !dish.enabled }), dish.enabled ? `已暂停：${dish.name}` : `已恢复：${dish.name}`)
 }
 
+function promote(dish) {
+  const label = dish.shop ? `${dish.name}（${dish.shop}）` : dish.name
+  if (!window.confirm(`把“${label}”移到通用菜单？
+移过去以后没登录的人也能抽到它（在 Excel 导出里也会有它）。`)) return
+  return run(() => promoteDish(dish.id), `已移到通用菜单：${label}`)
+}
+
 function remove(dish) {
   const label = dish.shop ? `${dish.name}（${dish.shop}）` : dish.name
   if (!window.confirm(`确定删掉“${label}”？删了就没了；只是暂时不想让它出现的话，用“暂停”。`)) return
@@ -83,9 +94,17 @@ function remove(dish) {
   <section>
     <div class="toolbar">
       <input v-model="query" type="search" placeholder="搜品类、店铺、分类、标签" aria-label="搜索菜" />
+      <select v-model="scope" aria-label="看哪些菜">
+        <option value="all">全部</option>
+        <option value="general">通用菜单</option>
+        <option value="shared">共享菜</option>
+      </select>
       <button type="button" class="primary" :disabled="busy" @click="startEdit('new')">新加一道菜</button>
     </div>
-    <p class="hint">共 {{ menu.dishes.length }} 道，启用 {{ enabledCount }} 道。改完马上生效，网站上的人刷新就能看到。</p>
+    <p class="hint">
+      共 {{ menu.dishes.length }} 道，启用 {{ enabledCount }} 道<template v-if="sharedCount">，其中共享菜 {{ sharedCount }} 道</template>。改完马上生效，网站上的人刷新就能看到。
+      共享菜是用户提交、审核通过的，只有登录的人能抽到。
+    </p>
     <p v-if="message" class="ok" role="status">{{ message }}</p>
     <p v-if="error && !editing" class="error" role="alert">{{ error }}</p>
 
@@ -107,6 +126,7 @@ function remove(dish) {
           <strong>{{ dish.name }}</strong>
           <span v-if="dish.shop" class="muted">（{{ dish.shop }}）</span>
           <span v-if="!dish.enabled" class="badge">暂停</span>
+          <span v-if="dish.scope === 'shared'" class="badge shared">共享 · {{ dish.author }} 提交</span>
           <div class="muted small">
             {{ dish.category }} · {{ dish.meals.map((id) => mealLabel.get(id) || id).join('、') }}
             <template v-if="dish.price !== null"> · 人均 ¥{{ dish.price }}</template>
@@ -116,6 +136,7 @@ function remove(dish) {
         <div class="dish-actions">
           <button type="button" :disabled="busy" @click="startEdit(dish)">改</button>
           <button type="button" :disabled="busy" @click="toggle(dish)">{{ dish.enabled ? '暂停' : '恢复' }}</button>
+          <button v-if="dish.scope === 'shared'" type="button" :disabled="busy" @click="promote(dish)">移到通用菜单</button>
           <button type="button" class="danger" :disabled="busy" @click="remove(dish)">删</button>
         </div>
       </li>

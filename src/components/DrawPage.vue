@@ -155,9 +155,9 @@ watch(meal, () => {
   cancelled.value = false
 })
 
-// 动画期间改了“不想吃的”、小名单或开关、或者切到别的模式：取消这次抽取，请用户重新点
-// （结果是动画开始前定的，可能已经不在候选里了）
-watch([excludedCategories, excludedIds, shortlist, shortlistOn, mode, avoidRecent, eatenRecords], () => {
+// 动画期间改了“不想吃的”、小名单或开关、切到别的模式、或者菜单范围变了（“全部 / 只看我加的”，阶段 4-4）：
+// 取消这次抽取，请用户重新点（结果是动画开始前定的，可能已经不在候选里了）
+watch([excludedCategories, excludedIds, shortlist, shortlistOn, mode, avoidRecent, eatenRecords, () => props.items], () => {
   if (!rolling.value) return
   stopRolling()
   cancelled.value = true
