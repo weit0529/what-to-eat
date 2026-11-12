@@ -9,6 +9,8 @@
       页面底部提示“菜单有更新”，用户点了才换；换的时候整页重新开始（DrawPage 重建），不留旧状态
   登录用户（阶段 4-4，R-024）：本机存着登录凭证时去取“内部菜单”（通用 + 共享 + 我的，/api/my/menu），
   凭证失效（401）就清掉凭证、改取通用菜单；连不上照样用内置菜单。取到内部菜单后，菜单上方可切换“全部 / 只看我加的”。
+  “最近吃过”（阶段 4-5，R-025）：登录着就用账号里的记录（src/ui/eaten-account.js），打开页面时同步一次；
+  凭证失效（取菜单或同步记录时发现）就改回本机记录。账号编号登录时记下；以前登录的没记，就从内部菜单的回应里拿。
 -->
 <script setup>
 import { computed, onMounted, ref, shallowRef, watch } from 'vue'
@@ -16,10 +18,12 @@ import builtInMenu from './generated/menu.json'
 import DrawPage from './components/DrawPage.vue'
 import { API_BASE } from './config.js'
 import { fetchMenu } from './core/remote-menu.js'
+import { createAccountEatenStore } from './ui/eaten-account.js'
 
 /** 账号页存登录凭证、用户名的位置（和 src/account/api.js 一样） */
 const USER_TOKEN_KEY = 'what-to-eat:user-token:v1'
 const USER_NAME_KEY = 'what-to-eat:user-name:v1'
+const USER_ID_KEY = 'what-to-eat:user-id:v1'
 
 const props = defineProps({
   /** 测试里可以关掉从后台取菜单 */
@@ -51,18 +55,51 @@ function readStored(key) {
 }
 const token = readStored(USER_TOKEN_KEY)
 const signedInName = ref(token ? readStored(USER_NAME_KEY) || '已登录' : '')
+/** 这次打开时的登录还算不算数：凭证失效、或者别的标签页退出 / 换了账号后就是 false，之后迟到的回应一律不用 */
+const sessionAlive = ref(Boolean(token))
+/** 这台手机上现在登录的还是不是这次打开时的凭证 */
+const stillSameToken = () => readStored(USER_TOKEN_KEY) === token
+/**
+ * 登录用户的“吃过”记录；没登录（或凭证失效）是 null，抽菜页用本机记录。
+ * 登录着但还不知道账号编号（以前登录的）也建一个，只是先把改动记在内存里，知道编号后再转存、上传（Codex 第 48 轮：
+ * 不能这时就拿本机自己的记录来用）
+ */
+const eatenStore = shallowRef(null)
+if (token) {
+  eatenStore.value = createAccountEatenStore({
+    token,
+    userId: readStored(USER_ID_KEY) || null,
+    ...(props.fetchImpl ? { fetchImpl: props.fetchImpl } : {}),
+  })
+  // 同步记录时发现凭证失效、或者这台手机已经退出、换了账号：和取菜单时发现一样处理（Codex 第 47 轮）
+  watch(eatenStore.value.expired, (gone) => {
+    if (gone) forgetToken()
+  })
+}
 
-/** 凭证失效了：清掉（和账号页的做法一样），底部改回“登录 / 注册” */
+/**
+ * 凭证失效（或这台手机上已经不是这次的登录了）：清掉凭证（只清自己的，别的标签页新登录的不动），
+ * 底部改回“登录 / 注册”，“吃过”改回本机记录，菜单撤下私有的、改回通用菜单（Codex 第 48 轮）
+ */
 function forgetToken() {
+  if (!sessionAlive.value) return
+  sessionAlive.value = false
   try {
     if (localStorage.getItem(USER_TOKEN_KEY) === token) {
       localStorage.removeItem(USER_TOKEN_KEY)
       localStorage.removeItem(USER_NAME_KEY)
+      localStorage.removeItem(USER_ID_KEY)
     }
   } catch {
     // 存储不能用就算了
   }
   signedInName.value = ''
+  eatenStore.value?.dispose()
+  eatenStore.value = null
+  // 先用内置的通用菜单顶上，再去后台取最新的通用菜单
+  mineOnly.value = false
+  applyMenu(builtInMenu)
+  if (props.remote) loadGeneralMenu()
 }
 
 /** 两份菜单内容是否一样（餐次和菜都一样） */
@@ -83,16 +120,43 @@ watch(mineCount, (count) => {
 })
 const shownItems = computed(() => (isMyMenu.value && mineOnly.value ? menu.value.items.filter((item) => item.mine) : menu.value.items))
 
-onMounted(async () => {
-  if (!props.remote) return
+/** 取通用菜单（没登录、或登录失效后用） */
+async function loadGeneralMenu() {
   const opts = props.fetchImpl ? { fetchImpl: props.fetchImpl } : {}
-  let result = token ? await fetchMenu(`${API_BASE}/api/my/menu`, { ...opts, token }) : null
-  if (result?.status === 401) forgetToken()
-  if (!result?.menu) result = await fetchMenu(`${API_BASE}/api/menu`, opts)
-  const latest = result.menu
+  const { menu: latest } = await fetchMenu(`${API_BASE}/api/menu`, opts)
+  offerMenu(latest)
+}
+
+/** 后台取到的菜单：和现在的一样就不管；用户还没动过就换上，动过了就提示“菜单有更新” */
+function offerMenu(latest) {
   if (!latest || sameMenu(latest, menu.value)) return
   if (touched.value) pending.value = latest
   else applyMenu(latest)
+}
+
+onMounted(async () => {
+  if (!props.remote) return
+  if (!token) return loadGeneralMenu()
+  eatenStore.value?.sync()
+  const opts = props.fetchImpl ? { fetchImpl: props.fetchImpl } : {}
+  const result = await fetchMenu(`${API_BASE}/api/my/menu`, { ...opts, token })
+  // 等回应的时候登录可能已经失效、或者别的标签页换了账号：这次的回应不用（Codex 第 48 轮）
+  if (!sessionAlive.value) return
+  if (!stillSameToken()) return forgetToken()
+  if (result.status === 401) return forgetToken()
+  if (!result.menu) return loadGeneralMenu()
+  // 以前登录的没记下账号编号：从内部菜单的回应里拿；只在这台手机上登录的还是这个凭证时才记（上面刚查过）
+  if (result.userId && eatenStore.value && !eatenStore.value.bound.value) {
+    if (!readStored(USER_ID_KEY)) {
+      try {
+        localStorage.setItem(USER_ID_KEY, result.userId)
+      } catch {
+        // 存不了也照样用
+      }
+    }
+    eatenStore.value.bind(result.userId)
+  }
+  offerMenu(result.menu)
 })
 </script>
 
@@ -123,7 +187,7 @@ onMounted(async () => {
           只看我加的（{{ mineCount }}）
         </button>
       </div>
-      <DrawPage :key="pageKey" :items="shownItems" :meals="menu.meals" />
+      <DrawPage :key="pageKey" :items="shownItems" :meals="menu.meals" :eaten-store="eatenStore" />
     </main>
 
     <p v-if="pending" class="menu-update" role="status">

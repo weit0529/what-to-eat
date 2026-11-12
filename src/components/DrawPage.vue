@@ -6,6 +6,8 @@
   显示气泡“选好小名单了，去随机抽食物”，点一下跳到随机抽（用户 2026-11-05 11:56 要求）。
   “最近吃过”（阶段 3）：结果卡片上点“就吃这个”记一次，存在本机浏览器；
   打开“避开最近吃过的”时，随机抽和分析推荐都避开最近 3 天吃过的，小名单不避开。
+  登录后（阶段 4-5，R-025）“最近吃过”改用账号里的记录（eatenStore，见 src/ui/eaten-account.js），换手机登录也在；
+  不登录时照旧存在本机浏览器。
   除了“最近吃过”的记录，其他选择只存在页面里，刷新就恢复原样（需求 R-006）。
   抽取逻辑在 src/core/draw.js，推荐逻辑在 src/core/recommend.js，这里只负责界面和状态。
 -->
@@ -14,7 +16,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { MEALS } from '../core/menu-data.js'
 import { itemsForMeal, getCandidates, emptyReason, drawOne } from '../core/draw.js'
 import { shortlistItems } from '../core/recommend.js'
-import { recentRecords, recentIds, addRecord, removeToday, eatenToday } from '../core/eaten.js'
+import { recentRecords, recentIds, addRecord, removeToday, eatenToday, newRecord, todayRecord } from '../core/eaten.js'
 import { getStorage, loadRecords, saveRecords } from '../ui/eaten-store.js'
 import MealPicker from './MealPicker.vue'
 import ExcludePanel from './ExcludePanel.vue'
@@ -37,13 +39,24 @@ const props = defineProps({
   rollDuration: { type: Number, default: 700 },
   /** 存“最近吃过”的地方。不传就用浏览器的 localStorage；传 null 表示不存（测试用） */
   storage: { type: Object, default: undefined },
+  /** 登录用户的账号记录（createAccountEatenStore 的结果）；传了就不用本机记录（阶段 4-5） */
+  eatenStore: { type: Object, default: null },
 })
 
 // “最近吃过”的记录
-const storage = props.storage === undefined ? getStorage() : props.storage
+const account = props.eatenStore
+const storage = account ? null : props.storage === undefined ? getStorage() : props.storage
 /** 记录能不能存住：拿不到存储时为 false；之后每次保存失败也会变成 false（Codex 第 13 轮） */
-const storageOk = ref(storage !== null)
-const eatenRecords = ref(loadRecords(storage))
+const storageOk = account ? account.ok : ref(storage !== null)
+const eatenRecords = account ? account.records : ref(loadRecords(storage))
+/** 账号记录的同步情况，给“最近吃过”面板提示用 */
+const syncNote = computed(() => {
+  if (!account) return ''
+  if (account.expired.value) return '登录过期了：这几次的记录先存在这台手机上，重新登录后会补传。'
+  if (!account.bound.value) return '正在确认账号：这几次的记录先记在这一页里，连上后台后会存进账号（关掉页面前还没连上的话会丢）。'
+  if (account.offline.value) return '暂时连不上后台：记录先存在这台手机上，照样避开，连上后会自动补传。'
+  return ''
+})
 const avoidRecent = ref(true) // 是否避开最近吃过的（默认打开）
 
 /**
@@ -66,7 +79,10 @@ function scheduleMidnight() {
 }
 scheduleMidnight()
 function onVisible() {
-  if (document.visibilityState === 'visible') refreshNow()
+  if (document.visibilityState !== 'visible') return
+  refreshNow()
+  // 切回前台时同步一次账号记录（别的手机可能刚记过，用户选 5A）
+  account?.sync()
 }
 if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisible)
 onBeforeUnmount(() => {
@@ -87,10 +103,22 @@ function setRecords(records) {
   eatenRecords.value = records
   storageOk.value = saveRecords(records, storage)
 }
+/** 清空记录 */
+function clearRecords() {
+  if (account) account.clear()
+  else setRecords([])
+}
 /** 点“就吃这个”：今天还没记过就记一条，记过了就撤销 */
 function toggleEaten(item) {
   refreshNow()
   const at = new Date(now.value)
+  if (account) {
+    // 账号记录明确说是“记一条”还是“删这一条”（Codex 第 47 轮：不能靠比较前后两份去猜）
+    const today = todayRecord(eatenRecords.value, item.id, at)
+    if (today) account.remove(today.uid)
+    else account.add(newRecord(item, at))
+    return
+  }
   setRecords(
     eatenToday(eatenRecords.value, item.id, at)
       ? removeToday(eatenRecords.value, item.id, at)
@@ -276,7 +304,9 @@ function draw() {
         v-model:avoid="avoidRecent"
         :records="recentList"
         :storage-ok="storageOk"
-        @clear="setRecords([])"
+        :account="Boolean(account)"
+        :sync-note="syncNote"
+        @clear="clearRecords"
       />
 
       <AnalyzePanel

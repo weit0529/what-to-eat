@@ -1,6 +1,7 @@
 // 账号页和后台说话：登录、注册（邀请码 + 邮箱验证码）、找回密码。通用部分见 src/api-client.js。
 
 import { ApiError, createApiClient } from '../api-client.js'
+import { clearAccountEaten } from '../ui/eaten-account.js'
 
 export { ApiError }
 
@@ -8,9 +9,30 @@ export { ApiError }
 export const USER_TOKEN_KEY = 'what-to-eat:user-token:v1'
 /** 登录后记下用户名，正式网站页面底部显示用（不是秘密） */
 export const USER_NAME_KEY = 'what-to-eat:user-name:v1'
+/** 登录后记下账号编号：首页把“吃过”记录的副本按账号分开存（阶段 4-5，不是秘密） */
+export const USER_ID_KEY = 'what-to-eat:user-id:v1'
+/** 4-5 第一版用过的副本位置（不分账号），退出登录时顺手删掉 */
+const LEGACY_EATEN_KEY = 'what-to-eat:eaten-account:v1'
 
 const client = createApiClient(USER_TOKEN_KEY)
 export const { tokenSaveFailed, getToken, request, currentUser, changePassword } = client
+
+function rememberUserId(id) {
+  try {
+    if (id) localStorage.setItem(USER_ID_KEY, id)
+    else localStorage.removeItem(USER_ID_KEY)
+  } catch {
+    // 存不了：首页会从后台拿
+  }
+}
+
+function storedUserId() {
+  try {
+    return localStorage.getItem(USER_ID_KEY) || ''
+  } catch {
+    return ''
+  }
+}
 
 function rememberName(name) {
   try {
@@ -24,12 +46,23 @@ function rememberName(name) {
 export async function signIn(username, password, opts) {
   const user = await client.signIn(username, password, opts)
   rememberName(user?.displayUsername || user?.username || user?.name)
+  // 记下账号编号：首页按它分开存“吃过”记录的副本，别的账号的副本读不到（阶段 4-5，Codex 第 47 轮）
+  rememberUserId(user?.id)
   return user
 }
 
 export async function signOut(opts) {
+  const userId = storedUserId()
   await client.signOut(opts)
   rememberName('')
+  rememberUserId('')
+  // 退出登录：删掉这台手机上这个账号的“吃过”记录副本（共用手机时别人看不到）；本机自己的记录不动（用户选 1A）
+  clearAccountEaten(userId)
+  try {
+    localStorage.removeItem(LEGACY_EATEN_KEY)
+  } catch {
+    // 没关系
+  }
 }
 
 /** 注册第一步：凭邀请码往邮箱发验证码 */

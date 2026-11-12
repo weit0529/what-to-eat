@@ -17,6 +17,10 @@ const props = defineProps({
   avoid: { type: Boolean, required: true },
   /** 浏览器能不能存记录；不能时提示一下 */
   storageOk: { type: Boolean, default: true },
+  /** 记录是不是跟着账号走（登录后，阶段 4-5） */
+  account: { type: Boolean, default: false },
+  /** 账号记录同步的提示（连不上、登录过期）；没有就是空 */
+  syncNote: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:avoid', 'clear'])
@@ -48,7 +52,10 @@ const summary = computed(() => {
     <p v-if="!storageOk" class="hint warn">
       记录没存住（可能是无痕模式、禁止了网站数据，或者存储满了），刷新页面后会丢；这次打开期间照常避开。
     </p>
-    <p class="hint">记录只存在这台设备的这个浏览器里。小名单里抽的时候不避开。</p>
+    <p v-if="syncNote" class="hint warn">{{ syncNote }}</p>
+    <p class="hint">
+      {{ account ? '记录跟着账号走，换手机登录也在。' : '记录只存在这台设备的这个浏览器里。' }}小名单里抽的时候不避开。
+    </p>
   </CollapsePanel>
 </template>
 

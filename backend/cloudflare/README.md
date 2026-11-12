@@ -11,6 +11,7 @@
 | `src/account-api.js` | 普通用户注册（邀请码 + 邮箱验证码）、管理员的邀请码 |
 | `src/my-menu-api.js` | 我的菜单（登录用户加菜、提交审核）、管理员审核、共享菜移到通用菜单、加菜总开关和黑白名单 |
 | `src/images-api.js` | 菜的图片：上传（存 R2）、转发（经 pages.dev，大陆能打开） |
+| `src/eaten-api.js` | 吃过记录跟账号走：网页攒下的改动一起同步，返回账号里的记录 |
 | `src/send-limits.js` | 发信和改菜的次数限制（判断和占用在一条 SQL 里） |
 | `src/mailer.js` | 发验证码邮件（worker-mailer 连 QQ 邮箱 SMTP） |
 | `src/connectivity.js` | 阶段 4-1 连通测试用的接口（测试页 `/connectivity-test/` 在用） |

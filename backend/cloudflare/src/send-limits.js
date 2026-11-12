@@ -109,3 +109,6 @@ export const imageLimits = (userId) => [
   { key: `img-day:${userId}`, windowMs: DAY, max: 50 },
   { key: 'img-total', windowMs: IMAGE_TOTAL_WINDOW_MS, max: IMAGE_DAILY_TOTAL },
 ]
+
+/** 吃过记录同步（阶段 4-5）：每人每分钟最多 60 次（打开页面、切回前台、点“就吃这个”都会同步） */
+export const eatenSyncLimits = (userId) => [{ key: `eaten-sync:${userId}`, windowMs: MINUTE, max: 60 }]

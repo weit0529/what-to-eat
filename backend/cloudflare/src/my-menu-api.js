@@ -142,7 +142,8 @@ async function myRoute(method, path, request, env, auth, now, reply) {
       ...dishes.map((row) => ({ ...rowToItem(row), mine: row.author_id === user.id })),
       ...mine.map(userRowToItem),
     ]
-    return reply({ version: MENU_FORMAT_VERSION, meals: allMeals(extra), items })
+    // userId：网页用它把“吃过”记录的本机副本按账号分开存（阶段 4-5）
+    return reply({ version: MENU_FORMAT_VERSION, meals: allMeals(extra), items, userId: user.id })
   }
 
   if (method === 'GET' && path === '/api/my/dishes') {

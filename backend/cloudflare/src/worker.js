@@ -22,6 +22,7 @@ import { accountRoute } from './account-api.js'
 import { menuRoute } from './menu-api.js'
 import { myMenuRoute } from './my-menu-api.js'
 import { imagesRoute } from './images-api.js'
+import { eatenRoute } from './eaten-api.js'
 import { releaseQuotas, resetIpLimits, resetLimits, takeQuotas } from './send-limits.js'
 
 /** 请求体的总上限（导入整份菜单最大 512KB，其他接口在各自的地方再限得更小） */
@@ -142,6 +143,9 @@ export async function handle(request, env, now = Date.now(), opts = {}) {
       }
       return withCors(await getAuth().handler(forward), cors)
     }
+
+    const eaten = await eatenRoute(request.method, url.pathname, request, env, getAuth, now, started, cors)
+    if (eaten) return eaten
 
     const images = await imagesRoute(request.method, url.pathname, request, env, getAuth, now, started, cors)
     if (images) return images

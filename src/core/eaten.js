@@ -81,9 +81,26 @@ export function eatenToday(records, id, now = new Date()) {
 }
 
 /** 记一条“吃了这道菜”，返回新的记录列表（不改原数组） */
-export function addRecord(records, item, now = new Date()) {
+/** 一道菜的一条新记录（本机记录和账号记录共用，阶段 4-5） */
+export function newRecord(item, now = new Date()) {
   const label = item.shop ? `${item.name} · ${item.shop}` : item.name
-  return pruneRecords([...(Array.isArray(records) ? records : []), { id: item.id, label, at: new Date(now).toISOString() }], now)
+  return { id: item.id, label, at: new Date(now).toISOString() }
+}
+
+export function addRecord(records, item, now = new Date()) {
+  return pruneRecords([...(Array.isArray(records) ? records : []), newRecord(item, now)], now)
+}
+
+/** 这道菜今天最后记的那一条（撤销“就吃这个”时删它）；没有返回 null */
+export function todayRecord(records, id, now = new Date()) {
+  const list = pruneRecords(records, now)
+  const todayStart = startOfDay(now).getTime()
+  const latest = new Date(now).getTime() + FUTURE_TOLERANCE_MS
+  for (let i = list.length - 1; i >= 0; i--) {
+    const t = Date.parse(list[i].at)
+    if (list[i].id === id && t >= todayStart && t <= latest) return list[i]
+  }
+  return null
 }
 
 /**
@@ -92,15 +109,8 @@ export function addRecord(records, item, now = new Date()) {
  */
 export function removeToday(records, id, now = new Date()) {
   const list = pruneRecords(records, now)
-  const todayStart = startOfDay(now).getTime()
-  const latest = new Date(now).getTime() + FUTURE_TOLERANCE_MS
-  for (let i = list.length - 1; i >= 0; i--) {
-    const t = Date.parse(list[i].at)
-    if (list[i].id === id && t >= todayStart && t <= latest) {
-      return [...list.slice(0, i), ...list.slice(i + 1)]
-    }
-  }
-  return list
+  const target = todayRecord(list, id, now)
+  return target ? list.filter((r) => r !== target) : list
 }
 
 /** 显示用：今天 / 昨天 / 前天 / N 天前 */

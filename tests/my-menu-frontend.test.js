@@ -36,6 +36,8 @@ const mine = {
   ],
 }
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status })
+/** 只看取菜单的请求（登录后还会同步“吃过”记录，阶段 4-5） */
+const menuCalls = (fetchImpl) => fetchImpl.mock.calls.filter(([url]) => /\/api\/(my\/)?menu$/.test(url))
 
 beforeEach(() => localStorage.clear())
 afterEach(() => {
@@ -50,8 +52,8 @@ describe('首页：登录后用内部菜单', () => {
     const fetchImpl = vi.fn(async () => json(mine))
     const w = mount(App, { props: { fetchImpl } })
     await flushPromises()
-    expect(fetchImpl).toHaveBeenCalledTimes(1)
-    const [url, init] = fetchImpl.mock.calls[0]
+    expect(menuCalls(fetchImpl)).toHaveLength(1)
+    const [url, init] = menuCalls(fetchImpl)[0]
     expect(url).toMatch(/\/api\/my\/menu$/)
     expect(init.headers.authorization).toBe('Bearer tok-1')
 
@@ -79,7 +81,7 @@ describe('首页：登录后用内部菜单', () => {
     const fetchImpl = vi.fn(async (url) => (url.endsWith('/api/my/menu') ? json({ error: '请先登录' }, 401) : json(general)))
     const w = mount(App, { props: { fetchImpl } })
     await flushPromises()
-    expect(fetchImpl.mock.calls.map(([url]) => url.replace(/^.*\/api/, '/api'))).toEqual(['/api/my/menu', '/api/menu'])
+    expect(menuCalls(fetchImpl).map(([url]) => url.replace(/^.*\/api/, '/api'))).toEqual(['/api/my/menu', '/api/menu'])
     expect(localStorage.getItem(TOKEN_KEY)).toBe(null)
     expect(w.find('.account-link').text()).toBe('登录 / 注册')
     expect(w.find('.scope-tabs').exists()).toBe(false)
