@@ -51,6 +51,13 @@ export const COLUMNS = {
 /** 支持的图片格式 */
 const IMAGE_EXTENSIONS = /\.(jpe?g|png|webp|gif)$/i
 
+/**
+ * 在线上传的图片（阶段 4-4d，R-030）：文件名是 up_ 加 32 位随机十六进制，存在 Cloudflare R2，
+ * 由后台 /api/images/文件名 转发；不在 public/images/ 里
+ */
+export const UPLOADED_IMAGE_RE = /^up_[0-9a-f]{32}\.(webp|jpg|png)$/
+export const isUploadedImage = (name) => typeof name === 'string' && UPLOADED_IMAGE_RE.test(name)
+
 // 列表类的格子（标签、餐次）可以用这些符号隔开：顿号、中英文逗号、中英文分号、换行
 const LIST_SEPARATOR = /[、,，;；\n]+/
 // 餐次里的词不会带空格，所以空格也可以当分隔符
@@ -274,6 +281,8 @@ function checkImage(fileName, imageFiles) {
   if (!IMAGE_EXTENSIONS.test(fileName)) {
     return { image: null, warning: `“${fileName}”不是支持的图片格式（jpg、jpeg、png、webp、gif）` }
   }
+  // 在线上传的图片不在 public/images/ 里，不用查文件夹（后台会查它存不存在）
+  if (isUploadedImage(fileName)) return { image: fileName }
 
   if (imageFiles) {
     if (imageFiles.includes(fileName)) return { image: fileName }

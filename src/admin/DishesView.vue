@@ -4,7 +4,7 @@
 -->
 <script setup>
 import { computed, ref } from 'vue'
-import { createDish, deleteDish, promoteDish, updateDish } from './api.js'
+import { createDish, deleteDish, promoteDish, updateDish, uploadImage } from './api.js'
 import DishForm from './DishForm.vue'
 
 const props = defineProps({
@@ -108,13 +108,16 @@ function remove(dish) {
     <p v-if="message" class="ok" role="status">{{ message }}</p>
     <p v-if="error && !editing" class="error" role="alert">{{ error }}</p>
 
+    <!-- key：换一道菜就换一个新表单，上一道菜没传完的图片不会填到这道菜上（Codex 第 41 轮） -->
     <DishForm
       v-if="editing"
+      :key="editing === 'new' ? 'new' : editing.id"
       :dish="editing === 'new' ? null : editing"
       :meals="menu.meals"
       :categories="categories"
       :server-errors="serverErrors"
       :busy="busy"
+      :upload-image="uploadImage"
       @save="save"
       @cancel="editing = null"
     />

@@ -14,6 +14,7 @@ import AdminsView from './AdminsView.vue'
 import InvitesView from './InvitesView.vue'
 import ReviewsView from './ReviewsView.vue'
 import AccessView from './AccessView.vue'
+import StorageBar from './StorageBar.vue'
 
 const reviewCount = ref(0)
 const TABS = computed(() => [
@@ -119,7 +120,10 @@ onMounted(async () => {
       </p>
 
       <template v-if="menu">
-        <DishesView v-if="tab === 'dishes'" :menu="menu" @changed="loadMenu" />
+        <template v-if="tab === 'dishes'">
+          <StorageBar />
+          <DishesView :menu="menu" @changed="loadMenu" />
+        </template>
         <ReviewsView v-else-if="tab === 'reviews'" :menu="menu" @changed="onReviewed" />
         <MealsView v-else-if="tab === 'meals'" :menu="menu" @changed="loadMenu" />
         <ExcelView v-else-if="tab === 'excel'" :menu="menu" @changed="loadMenu" />

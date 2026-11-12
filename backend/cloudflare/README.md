@@ -10,6 +10,7 @@
 | `src/menu-api.js` | 菜单：网站读菜单（公开）；管理员增删改、导入、餐次、管理员名单 |
 | `src/account-api.js` | 普通用户注册（邀请码 + 邮箱验证码）、管理员的邀请码 |
 | `src/my-menu-api.js` | 我的菜单（登录用户加菜、提交审核）、管理员审核、共享菜移到通用菜单、加菜总开关和黑白名单 |
+| `src/images-api.js` | 菜的图片：上传（存 R2）、转发（经 pages.dev，大陆能打开） |
 | `src/send-limits.js` | 发信和改菜的次数限制（判断和占用在一条 SQL 里） |
 | `src/mailer.js` | 发验证码邮件（worker-mailer 连 QQ 邮箱 SMTP） |
 | `src/connectivity.js` | 阶段 4-1 连通测试用的接口（测试页 `/connectivity-test/` 在用） |
@@ -22,6 +23,7 @@
 | 名字 | 放哪 | 做什么 |
 |---|---|---|
 | `DB` | `wrangler.jsonc` | D1 数据库 `what-to-eat-test`（亚太区域） |
+| `IMAGES` | `wrangler.jsonc` | R2 存储桶 `what-to-eat-images`，放在线上传的菜图片（阶段 4-4d） |
 | `ALLOWED_ORIGINS` | `wrangler.jsonc` | 允许调用后台的网页（GitHub Pages、本机开发） |
 | `AUTH_BASE_URL` | `wrangler.jsonc` | 后台自己的网址 |
 | `BETTER_AUTH_SECRET` | secret | 登录用的密钥，随机 64 位十六进制；**换了它所有人都要重新登录** |
@@ -51,6 +53,12 @@ npx wrangler pages secret put BOOTSTRAP_TOKEN --project-name what-to-eat-api
 ```bash
 npx wrangler pages secret put SMTP_USER --project-name what-to-eat-api
 npx wrangler pages secret put SMTP_PASS --project-name what-to-eat-api
+```
+
+放菜图片的 R2 存储桶（阶段 4-4d）：先在 Cloudflare 控制台开通 R2（可能要绑卡），再建桶，然后才能部署（配置里绑了它，没建好会部署失败）：
+
+```bash
+npx wrangler r2 bucket create what-to-eat-images
 ```
 
 设完 secret 要再部署一次才生效。然后建第一个管理员（见 `scripts/create-first-admin.mjs`），其他管理员在管理页里加。

@@ -97,3 +97,15 @@ export const resetLimits = (email) => [
  * 加、改、删、提交审核都算一次，不退还
  */
 export const dishEditLimits = (userId) => [{ key: `dish-edit:${userId}`, windowMs: MINUTE, max: 30 }]
+
+/**
+ * 上传图片的次数（阶段 4-4d，R-030）：每人一天 50 张、全站一天 1000 张，防止有人刷满 R2 的免费额度。
+ * 另外和改菜共用“每分钟 30 次”。不退还
+ */
+export const IMAGE_DAILY_TOTAL = 1000
+export const IMAGE_TOTAL_WINDOW_MS = DAY
+export const imageLimits = (userId) => [
+  ...dishEditLimits(userId),
+  { key: `img-day:${userId}`, windowMs: DAY, max: 50 },
+  { key: 'img-total', windowMs: IMAGE_TOTAL_WINDOW_MS, max: IMAGE_DAILY_TOTAL },
+]

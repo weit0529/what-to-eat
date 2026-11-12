@@ -7,7 +7,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import DishForm from '../admin/DishForm.vue'
-import { addMyDish, deleteMyDish, listMyDishes, myMenu, submitMyDish, updateMyDish } from './api.js'
+import { addMyDish, deleteMyDish, listMyDishes, myMenu, submitMyDish, updateMyDish, uploadImage } from './api.js'
 
 const loading = ref(true)
 const busy = ref(false)
@@ -121,15 +121,18 @@ onMounted(() =>
         <button type="button" class="primary" :disabled="busy" @click="startEdit('new')">加一道菜</button>
       </div>
 
+      <!-- key：换一道菜就换一个新表单，上一道菜没传完的图片不会填到这道菜上（Codex 第 41 轮） -->
       <DishForm
         v-if="editing"
+        :key="editing === 'new' ? 'new' : editing.id"
         :dish="editing === 'new' ? null : editing"
         :meals="meals"
         :categories="categories"
         :server-errors="serverErrors"
         :busy="busy"
-        :show-image="false"
         :show-enabled="false"
+        :bundled-images="false"
+        :upload-image="uploadImage"
         :title="editing === 'new' ? '加一道菜' : `改：${editing.name}`"
         @save="save"
         @cancel="editing = null"

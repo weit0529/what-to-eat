@@ -125,13 +125,15 @@ describe('三层菜单：我的菜只有自己看得到', () => {
     expect(ids((await call('GET', '/api/my/menu', { token: hong.token })).data.items)).toEqual([general.id])
   })
 
-  it('加菜的规则和管理员一样；图片先不能填；自己的菜不能重复，但可以和通用菜单同名', async () => {
+  it('加菜的规则和管理员一样；不能用随网站发布的图片；自己的菜不能重复，但可以和通用菜单同名', async () => {
     const { ming } = await setup()
     const bad = await call('POST', '/api/my/dishes', { body: { name: '没分类', meals: ['lunch'] }, token: ming.token })
     expect(bad.status).toBe(400)
     expect(bad.data.errors.map((e) => e.field)).toContain('category')
     const withImage = await call('POST', '/api/my/dishes', { body: { ...MINE, image: 'malatang.jpg' }, token: ming.token })
-    expect(withImage.data.dish.image).toBe(null)
+    expect(withImage.status).toBe(400)
+    expect(withImage.data.errors[0]).toMatchObject({ field: 'image', message: '只能用自己上传的图片' })
+    expect((await call('POST', '/api/my/dishes', { body: MINE, token: ming.token })).status).toBe(201)
     expect((await call('POST', '/api/my/dishes', { body: MINE, token: ming.token })).status).toBe(400)
     expect((await call('POST', '/api/my/dishes', { body: GENERAL, token: ming.token })).status).toBe(201)
   })

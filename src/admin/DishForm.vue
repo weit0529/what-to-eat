@@ -1,12 +1,13 @@
 <!--
   加 / 改一道菜的表单。提交前先用和后台同一套规则（validateDish）检查一遍，有错直接在对应的格子下面说明；
   后台还会再检查一次（不能只靠网页拦），后台说有错也显示在这里。
-  账号页“我的菜”（阶段 4-4）也用它：不显示图片（上传在 4-4d）和“启用”两项。
+  账号页“我的菜”（阶段 4-4）也用它：不显示“启用”，图片只能自己上传（4-4d）。
 -->
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { validateDish } from '../core/menu-data.js'
 import imageFiles from '../generated/images.json'
+import ImageField from './ImageField.vue'
 
 const props = defineProps({
   /** 要改的菜；新加时为 null */
@@ -18,8 +19,12 @@ const props = defineProps({
   /** 后台返回的错误 [{ field, message }] */
   serverErrors: { type: Array, default: () => [] },
   busy: { type: Boolean, default: false },
-  /** 显示“图片”一项（账号页先不显示） */
+  /** 显示“图片”一项 */
   showImage: { type: Boolean, default: true },
+  /** 上传图片的函数 (blob) => 文件名（阶段 4-4d）；不传就不能上传 */
+  uploadImage: { type: Function, default: null },
+  /** 能不能从随网站发布的 public/images/ 里选（管理页能，用户不能） */
+  bundledImages: { type: Boolean, default: true },
   /** 显示“启用”一项（用户的菜没有启用 / 暂停） */
   showEnabled: { type: Boolean, default: true },
   /** 标题；不传就按新加 / 修改自动写 */
@@ -33,6 +38,8 @@ const TAG_SEPARATOR = /[、,，;；\n]+/
 const blank = () => ({ name: '', shop: '', category: '', meals: [], tags: '', price: '', description: '', image: '', enabled: true })
 const form = reactive(blank())
 const localErrors = ref([])
+/** 图片正在压缩、上传：这时不能保存，不然存进去的是旧图（Codex 第 41 轮） */
+const uploading = ref(false)
 
 watch(
   () => props.dish,
@@ -55,8 +62,6 @@ watch(
 
 const errors = computed(() => [...localErrors.value, ...props.serverErrors])
 const errorOf = (field) => errors.value.filter((e) => e.field === field).map((e) => e.message).join('；')
-// 已经选了、但现在 public/images/ 里没有的图片，也放进下拉框，免得改别的项时把它清掉
-const imageOptions = computed(() => (form.image && !imageFiles.includes(form.image) ? [form.image, ...imageFiles] : imageFiles))
 
 function toPayload() {
   const price = form.price === '' || form.price === null ? null : Number(form.price)
@@ -77,6 +82,10 @@ function toPayload() {
 }
 
 function submit() {
+  if (uploading.value) {
+    localErrors.value = [{ field: 'image', message: '图片还在上传，传完再保存' }]
+    return
+  }
   const payload = toPayload()
   const { errors: found } = validateDish(payload, { mealIds: props.meals.map((m) => m.id) })
   localErrors.value = found
@@ -134,24 +143,30 @@ function submit() {
       <small v-if="errorOf('description')" class="error">{{ errorOf('description') }}</small>
     </label>
 
-    <label v-if="showImage" class="field">
+    <div v-if="showImage" class="field">
       <span>图片</span>
-      <select v-model="form.image">
-        <option value="">不用图片</option>
-        <option v-for="file in imageOptions" :key="file" :value="file">{{ file }}</option>
-      </select>
+      <ImageField
+        v-model="form.image"
+        :upload="uploadImage"
+        :bundled="bundledImages ? imageFiles : null"
+        :disabled="busy"
+        @busy="uploading = $event"
+      />
       <small class="hint">
-        只能选项目 public/images/ 里已有的图片；新图片要放进那个文件夹、发布网站后才能选（在线上传以后再做）。
+        {{ uploadImage ? '上传前会自动压缩（最长边 1024 像素，约 200 KB），照片里的拍摄地点等信息也会去掉。' : '' }}
+        {{ bundledImages ? '也可以选项目 public/images/ 里随网站发布的图片。' : '' }}
       </small>
       <small v-if="errorOf('image')" class="error">{{ errorOf('image') }}</small>
-    </label>
+    </div>
 
     <label v-if="showEnabled" class="check">
       <input v-model="form.enabled" type="checkbox" />启用（不勾就暂停：网站上不显示，但留着）
     </label>
 
     <div class="actions">
-      <button type="submit" class="primary" :disabled="busy">{{ busy ? '正在保存……' : '保存' }}</button>
+      <button type="submit" class="primary" :disabled="busy || uploading">
+        {{ busy ? '正在保存……' : uploading ? '图片上传中……' : '保存' }}
+      </button>
       <button type="button" :disabled="busy" @click="emit('cancel')">取消</button>
     </div>
   </form>

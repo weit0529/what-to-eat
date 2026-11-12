@@ -203,6 +203,15 @@ describe('图片（只提醒，不挡发布）', () => {
     expect(result.warnings).toEqual([])
   })
 
+  it('在线上传的图片（up_ 开头）不在 public/images/ 里，也照样保留、不提醒（阶段 4-4d）', () => {
+    const name = `up_${'a'.repeat(32)}.webp`
+    const result = withImage(name, [])
+    expect(result.items[0].image).toBe(name)
+    expect(result.warnings).toEqual([])
+    // 长得像但不合规的，照旧当普通文件名检查
+    expect(withImage('up_123.webp', []).items[0].image).toBeNull()
+  })
+
   it('文件不存在时提醒，并且不显示图片', () => {
     const result = withImage('a.jpg', [])
     expect(result.errors).toEqual([])

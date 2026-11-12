@@ -7,6 +7,7 @@
 import { computed, ref, watch } from 'vue'
 import { IconMapPin } from '@tabler/icons-vue'
 import { iconForCategory } from '../ui/icons.js'
+import { imageUrlOf } from '../ui/image-url.js'
 
 const props = defineProps({
   item: { type: Object, required: true },
@@ -21,13 +22,8 @@ watch(
   },
 )
 
-/**
- * 图片地址。文件名要编码，否则带 #、% 、空格等字符的文件名会被浏览器误读。
- * BASE_URL 是网站的根路径（见 vite.config.js 的 base），发布到 GitHub Pages 子目录时也能找到。
- */
-const imageUrl = computed(() =>
-  props.item.image ? `${import.meta.env.BASE_URL}images/${encodeURIComponent(props.item.image)}` : null,
-)
+/** 图片地址：随网站发布的图片，或在线上传的图片（阶段 4-4d，见 src/ui/image-url.js） */
+const imageUrl = computed(() => imageUrlOf(props.item.image))
 
 const categoryIcon = computed(() => iconForCategory(props.item.category))
 

@@ -22,7 +22,7 @@
 // 加菜权限（R-029）：总开关打开时所有用户能加改，黑名单除外；关上时谁都不能，白名单除外；管理员不受限。
 // 被禁止的人已加的菜照常能用（在内部菜单里），只是不能加、改、删、提交。
 
-import { validateDish } from '../../../src/core/menu-data.js'
+import { isUploadedImage, validateDish } from '../../../src/core/menu-data.js'
 import { randomHex } from './auth.js'
 import { json, readJson, TOO_LARGE } from './http.js'
 import { allMeals, checkDish, dishParams, extraMeals, mealIdsOf, MEALS_EXIST, requireAdmin, rowToItem, SELECT_DISH } from './menu-api.js'
@@ -64,7 +64,7 @@ function userRowToMyDish(row) {
 }
 
 /** 当前登录的用户（任何角色）；没登录返回 null */
-async function currentUser(request, auth) {
+export async function currentUser(request, auth) {
   const session = await auth.api.getSession({ headers: request.headers })
   return session?.user ?? null
 }
@@ -75,23 +75,30 @@ async function isOpen(env) {
   return row?.value !== '0'
 }
 
-/** 这个用户现在能不能加、改、删、提交菜 */
-async function canEdit(env, user) {
+/** 这个用户现在能不能加、改、删、提交菜（也管能不能传图片，images-api.js） */
+export async function canEdit(env, user) {
   if (user.role === 'admin') return true
   const row = await env.DB.prepare('SELECT list FROM dish_access WHERE user_id = ?').bind(user.id).first()
   return (await isOpen(env)) ? row?.list !== 'black' : row?.list === 'white'
 }
 
 /**
- * 检查用户填的菜：规则和管理员一样（validateDish），只是图片先不能填（图片上传在 4-4d）；
+ * 检查用户填的菜：规则和管理员一样（validateDish）；图片只能用自己在线上传的（4-4d，R-030），
+ * 不能用随网站发布的图片，也不能用别人传的。
  * 自己的菜里不能有两道“品类 + 店铺”一样的。和通用菜单、共享菜重名可以（审核时提示）
  */
 async function checkMyDish(env, userId, input, exceptId) {
   const extra = await extraMeals(env)
-  const { dish, errors } = validateDish({ ...(input && typeof input === 'object' ? input : {}), image: null, enabled: true }, {
+  const { dish, errors } = validateDish({ ...(input && typeof input === 'object' ? input : {}), enabled: true }, {
     mealIds: mealIdsOf(extra),
   })
   if (!dish) return { errors }
+  if (dish.image) {
+    const own = isUploadedImage(dish.image)
+      ? await env.DB.prepare('SELECT 1 FROM images WHERE name = ? AND owner_id = ?').bind(dish.image, userId).first()
+      : null
+    if (!own) return { errors: [{ field: 'image', message: '只能用自己上传的图片' }] }
+  }
   const dup = await env.DB.prepare('SELECT id FROM user_dishes WHERE owner_id = ? AND name = ? AND shop = ? AND id <> ?')
     .bind(userId, dish.name, dish.shop ?? '', exceptId ?? '')
     .first()

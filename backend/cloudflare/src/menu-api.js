@@ -16,7 +16,7 @@
 // 一次性：
 //   POST   /api/admin/bootstrap    还没有任何管理员时，凭 BOOTSTRAP_TOKEN 建第一个管理员（建好后这个接口就没用了）
 
-import { MEALS, validateDish, validateExtraMeals } from '../../../src/core/menu-data.js'
+import { isUploadedImage, MEALS, validateDish, validateExtraMeals } from '../../../src/core/menu-data.js'
 import { isAllowedEmail, USERNAME_RE } from './auth-setup.js'
 import { randomHex } from './auth.js'
 import { json, readJson, TOO_LARGE } from './http.js'
@@ -103,6 +103,11 @@ export async function checkDish(env, input, exceptId) {
   const extra = await extraMeals(env)
   const { dish, errors } = validateDish(input, { mealIds: mealIdsOf(extra) })
   if (!dish) return { errors }
+  // 在线上传的图片要真的存在（4-4d）；随网站发布的图片由网页的下拉框限定
+  if (isUploadedImage(dish.image)) {
+    const found = await env.DB.prepare('SELECT 1 FROM images WHERE name = ?').bind(dish.image).first()
+    if (!found) return { errors: [{ field: 'image', message: '没有这张上传的图片（可能还没传完）' }] }
+  }
   const dup = await env.DB.prepare('SELECT id FROM dishes WHERE name = ? AND shop = ? AND id <> ?')
     .bind(dish.name, dish.shop ?? '', exceptId ?? '')
     .first()
@@ -399,6 +404,17 @@ async function importMenu(env, body, userId, now, reply) {
       problems.push(`第 ${index + 1} 道菜“${label}”和用户提交的共享菜重复。先在管理页把那道共享菜改名、删掉或移到通用菜单`)
     }
   })
+  // 表格里写的在线上传图片（up_ 开头）要真的存在（4-4d）
+  const uploaded = [...new Set(dishes.map(({ dish }) => dish.image).filter(isUploadedImage))]
+  if (uploaded.length > 0) {
+    const { results: found } = await env.DB.prepare('SELECT name FROM images WHERE name IN (SELECT value FROM json_each(?))')
+      .bind(JSON.stringify(uploaded))
+      .all()
+    const have = new Set(found.map((row) => row.name))
+    dishes.forEach(({ dish }, index) => {
+      if (isUploadedImage(dish.image) && !have.has(dish.image)) problems.push(`第 ${index + 1} 道菜：没有上传过“${dish.image}”这张图片`)
+    })
+  }
   // 表格的“餐次”页去掉了共享菜、用户自己的菜还在用的餐次：不导入（Codex 第 37 轮：那些菜导入后还留着，会抽不到）
   const inUse = await mealsInUse(env, mealIdsOf(meals), ['shared'])
   if (inUse) problems.push(`表格的“餐次”页少了还有菜在用的餐次：${inUse}。把那个餐次加回“餐次”页，或者先改掉那些菜`)

@@ -69,3 +69,5 @@ export const updateMyDish = (id, dish, opts) =>
 export const deleteMyDish = (id, opts) => request(`/api/my/dishes/${encodeURIComponent(id)}`, { method: 'DELETE', ...opts })
 export const submitMyDish = (id, opts) =>
   request(`/api/my/dishes/${encodeURIComponent(id)}/submit`, { method: 'POST', ...opts }).then((r) => r.data.dish)
+/** 上传一张（已压缩的）图片，返回文件名（up_ 开头），填进自己的菜的 image（阶段 4-4d） */
+export const uploadImage = (blob, opts) => request('/api/images', { method: 'POST', body: blob, ...opts }).then((r) => r.data.image)

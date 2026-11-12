@@ -40,3 +40,7 @@ export const getDishAccess = (opts) => request('/api/admin/dish-access', opts).t
 export const setDishesOpen = (open, opts) => request('/api/admin/dish-access', { method: 'PUT', body: { open }, ...opts }).then((r) => r.data)
 export const setUserList = (userId, list, opts) =>
   request(`/api/admin/dish-access/${encodeURIComponent(userId)}`, { method: 'PUT', body: { list }, ...opts }).then((r) => r.data)
+/** 上传一张（已压缩的）图片，返回文件名（up_ 开头），填进菜的 image（阶段 4-4d） */
+export const uploadImage = (blob, opts) => request('/api/images', { method: 'POST', body: blob, ...opts }).then((r) => r.data.image)
+/** 图片存储用了多少（R2 免费 10 GB），管理页进度条用 */
+export const getStorage = (opts) => request('/api/admin/storage', opts).then((r) => r.data)

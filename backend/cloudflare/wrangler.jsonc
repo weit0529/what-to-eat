@@ -22,6 +22,10 @@
       "migrations_dir": "migrations"
     }
   ],
+  // 菜的图片（阶段 4-4d，R-030）：存在 R2。要先在 Cloudflare 控制台开通 R2，再运行
+  //   npx wrangler r2 bucket create what-to-eat-images
+  // 本机 wrangler dev 用本机模拟的 R2，不碰线上
+  "r2_buckets": [{ "binding": "IMAGES", "bucket_name": "what-to-eat-images" }],
   "vars": {
     // 允许调用的网页：正式网站（GitHub Pages）和本机开发地址
     "ALLOWED_ORIGINS": "https://weit0529.github.io,http://localhost:5173",

@@ -61,19 +61,21 @@ export function createApiClient(tokenKey) {
 
   /**
    * 调后台。成功返回 JSON；失败抛 ApiError。
+   * body 是 Blob（如压缩好的图片，阶段 4-4d）时原样发送，content-type 用它自己的类型；其他按 JSON 发
    * @param {string} path  例如 /api/admin/menu
    */
   async function request(path, { method = 'GET', body, fetchImpl = fetch } = {}) {
     const headers = {}
     const token = getToken()
     if (token) headers.authorization = `Bearer ${token}`
-    if (body !== undefined) headers['content-type'] = 'application/json'
+    const isBlob = typeof Blob !== 'undefined' && body instanceof Blob
+    if (body !== undefined) headers['content-type'] = isBlob ? body.type || 'application/octet-stream' : 'application/json'
     let res
     try {
       res = await fetchImpl(`${API_BASE}${path}`, {
         method,
         headers,
-        body: body === undefined ? undefined : JSON.stringify(body),
+        body: body === undefined ? undefined : isBlob ? body : JSON.stringify(body),
         signal: AbortSignal.timeout(TIMEOUT_MS),
       })
     } catch {

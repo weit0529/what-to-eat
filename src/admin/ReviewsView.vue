@@ -8,7 +8,8 @@
 -->
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { approveReview, listReviews, rejectReview } from './api.js'
+import { approveReview, listReviews, rejectReview, uploadImage } from './api.js'
+import { imageUrlOf } from '../ui/image-url.js'
 import DishForm from './DishForm.vue'
 
 const props = defineProps({
@@ -118,13 +119,16 @@ onMounted(() =>
     <p v-if="message" class="ok" role="status">{{ message }}</p>
     <p v-if="error && !editing" class="error" role="alert">{{ error }}</p>
 
+    <!-- key：换一道菜就换一个新表单，上一道菜没传完的图片不会填到这道菜上（Codex 第 41 轮） -->
     <DishForm
       v-if="editing"
+      :key="editing.id"
       :dish="editingDish"
       :meals="menu.meals"
       :categories="categories"
       :server-errors="serverErrors"
       :busy="busy"
+      :upload-image="uploadImage"
       :title="`改了再通过：${editing.name}（${editing.author} 提交）`"
       @save="approveEdited"
       @cancel="editing = null"
@@ -136,6 +140,7 @@ onMounted(() =>
 
     <ul class="dish-list">
       <li v-for="dish in reviews" :key="dish.id" class="dish-row review-row">
+        <img v-if="dish.image" class="review-thumb" :src="imageUrlOf(dish.image)" alt="" width="64" height="64" />
         <div class="dish-main">
           <strong>{{ dish.name }}</strong>
           <span v-if="dish.shop" class="muted">（{{ dish.shop }}）</span>
@@ -169,5 +174,15 @@ onMounted(() =>
 <style scoped>
 .reject-form {
   margin-top: 8px;
+}
+
+/* 用户传的图片：审核时要看一眼 */
+.review-thumb {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: var(--radius-inner);
+  border: 1px solid var(--border);
 }
 </style>
