@@ -5,7 +5,7 @@
   管理员关了加菜（或把自己放进了黑名单）时，已加的菜照常能用，只是不能加、改、删、提交。
 -->
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import DishForm from '../admin/DishForm.vue'
 import { addMyDish, deleteMyDish, listMyDishes, myMenu, submitMyDish, updateMyDish, uploadImage } from './api.js'
 
@@ -23,6 +23,8 @@ const meals = ref([])
 const categories = ref([])
 /** 正在改的菜；'new' 表示新加；null 表示没在改 */
 const editing = ref(null)
+/** 编辑表单（用来调它的 reveal 滚过去） */
+const dishForm = ref(null)
 
 const mealLabel = computed(() => new Map(meals.value.map((m) => [m.id, m.label])))
 const STATUS = { private: '只有自己看得到', pending: '审核中', rejected: '被退回' }
@@ -55,11 +57,14 @@ async function run(action, done) {
   }
 }
 
-function startEdit(dish) {
+async function startEdit(dish) {
   editing.value = dish
   error.value = ''
   message.value = ''
   serverErrors.value = []
+  // 表单出来（或已经开着）后滚过去，同一道菜再点也滚（R-032，Codex 第 45 轮）
+  await nextTick()
+  dishForm.value?.reveal()
 }
 
 const save = (payload) =>
@@ -123,6 +128,7 @@ onMounted(() =>
 
       <!-- key：换一道菜就换一个新表单，上一道菜没传完的图片不会填到这道菜上（Codex 第 41 轮） -->
       <DishForm
+        ref="dishForm"
         v-if="editing"
         :key="editing === 'new' ? 'new' : editing.id"
         :dish="editing === 'new' ? null : editing"

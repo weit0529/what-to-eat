@@ -2,6 +2,9 @@
   加 / 改一道菜的表单。提交前先用和后台同一套规则（validateDish）检查一遍，有错直接在对应的格子下面说明；
   后台还会再检查一次（不能只靠网页拦），后台说有错也显示在这里。
   账号页“我的菜”（阶段 4-4）也用它：不显示“启用”，图片只能自己上传（4-4d）。
+  reveal()：滚到表单、光标放进第一个格子（用户 2026-11-12 验收时提，R-032：表单在列表上方，点了“改”看不到）。
+  调用方每点一次“改” / “新加”都调一次（Codex 第 45 轮：只在出现时滚的话，表单开着再点同一道菜不会滚回来）；
+  保存失败时不调，表单留在原地。
 -->
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
@@ -40,6 +43,18 @@ const form = reactive(blank())
 const localErrors = ref([])
 /** 图片正在压缩、上传：这时不能保存，不然存进去的是旧图（Codex 第 41 轮） */
 const uploading = ref(false)
+
+const root = ref(null)
+/** 滚到表单、聚焦第一个格子（调用方在每次点“改” / “新加”后调） */
+function reveal() {
+  const el = root.value
+  if (!el) return
+  const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
+  el.scrollIntoView?.({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
+  // 光标放进第一个格子；不让浏览器再跳一次（上面已经滚好了）
+  el.querySelector('input')?.focus?.({ preventScroll: true })
+}
+defineExpose({ reveal })
 
 watch(
   () => props.dish,
@@ -94,7 +109,7 @@ function submit() {
 </script>
 
 <template>
-  <form class="block dish-form" @submit.prevent="submit">
+  <form ref="root" class="block dish-form" @submit.prevent="submit">
     <h2>{{ title || (dish ? `改：${dish.name}` : '新加一道菜') }}</h2>
 
     <div class="grid">

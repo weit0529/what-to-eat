@@ -3,7 +3,7 @@
   改完马上存到后台，网站上的人刷新就能看到，不用重新发布（REQUIREMENTS.md D-02）。
 -->
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { createDish, deleteDish, promoteDish, updateDish, uploadImage } from './api.js'
 import DishForm from './DishForm.vue'
 
@@ -18,6 +18,8 @@ const query = ref('')
 const scope = ref('all')
 /** 正在编辑的菜：null = 没在编辑；'new' = 新加；否则是那道菜 */
 const editing = ref(null)
+/** 编辑表单（用来调它的 reveal 滚过去） */
+const dishForm = ref(null)
 const busy = ref(false)
 const message = ref('')
 const error = ref('')
@@ -37,11 +39,14 @@ const shown = computed(() => {
   )
 })
 
-function startEdit(dish) {
+async function startEdit(dish) {
   editing.value = dish
   serverErrors.value = []
   message.value = ''
   error.value = ''
+  // 表单出来（或已经开着）后滚过去，同一道菜再点也滚（R-032，Codex 第 45 轮）
+  await nextTick()
+  dishForm.value?.reveal()
 }
 
 async function run(action, done) {
@@ -110,6 +115,7 @@ function remove(dish) {
 
     <!-- key：换一道菜就换一个新表单，上一道菜没传完的图片不会填到这道菜上（Codex 第 41 轮） -->
     <DishForm
+      ref="dishForm"
       v-if="editing"
       :key="editing === 'new' ? 'new' : editing.id"
       :dish="editing === 'new' ? null : editing"
@@ -130,6 +136,7 @@ function remove(dish) {
           <span v-if="dish.shop" class="muted">（{{ dish.shop }}）</span>
           <span v-if="!dish.enabled" class="badge">暂停</span>
           <span v-if="dish.scope === 'shared'" class="badge shared">共享 · {{ dish.author }} 提交</span>
+          <span v-if="dish.image" class="badge has-image">有图</span>
           <div class="muted small">
             {{ dish.category }} · {{ dish.meals.map((id) => mealLabel.get(id) || id).join('、') }}
             <template v-if="dish.price !== null"> · 人均 ¥{{ dish.price }}</template>

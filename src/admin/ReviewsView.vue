@@ -7,7 +7,7 @@
   通过、退回都带上列表里看到的版本号：这期间用户改过、重新提交过，后台会拒绝，列表重新读一次（Codex 第 37 轮）。
 -->
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { approveReview, listReviews, rejectReview, uploadImage } from './api.js'
 import { imageUrlOf } from '../ui/image-url.js'
 import DishForm from './DishForm.vue'
@@ -26,6 +26,8 @@ const error = ref('')
 const serverErrors = ref([])
 /** 正在“改了再通过”的那道 */
 const editing = ref(null)
+/** 编辑表单（用来调它的 reveal 滚过去） */
+const dishForm = ref(null)
 /** 给表单的那道菜：用户的菜没有“启用”，默认启用（computed，免得每次渲染都换新对象、表单被重置） */
 const editingDish = computed(() => editing.value && { ...editing.value, enabled: true })
 /** 正在写退回理由的那道的 id，和理由 */
@@ -66,12 +68,15 @@ async function run(action, done) {
   }
 }
 
-function startEdit(dish) {
+async function startEdit(dish) {
   editing.value = dish
   rejecting.value = null
   error.value = ''
   message.value = ''
   serverErrors.value = []
+  // 表单出来（或已经开着）后滚过去，同一道菜再点也滚（R-032，Codex 第 45 轮）
+  await nextTick()
+  dishForm.value?.reveal()
 }
 
 function startReject(dish) {
@@ -121,6 +126,7 @@ onMounted(() =>
 
     <!-- key：换一道菜就换一个新表单，上一道菜没传完的图片不会填到这道菜上（Codex 第 41 轮） -->
     <DishForm
+      ref="dishForm"
       v-if="editing"
       :key="editing.id"
       :dish="editingDish"

@@ -201,3 +201,81 @@ describe('Excel 导出', () => {
     expect(menuToSheets.mock.calls[0][0].dishes.map((d) => d.id)).toEqual(['g1'])
   })
 })
+
+describe('验收时提的小改进（R-032）', () => {
+  it('点“改”：表单出现后自动滚过去，光标在第一个格子；换一道菜再点“改”也会再滚一次', async () => {
+    backend({})
+    const scrolled = vi.fn()
+    Element.prototype.scrollIntoView = scrolled
+    const w = mount(DishesView, { props: { menu: MENU }, attachTo: document.body })
+    const editOf = (i) => w.findAll('.dish-row')[i].findAll('button').find((b) => b.text() === '改')
+    await editOf(0).trigger('click')
+    expect(scrolled).toHaveBeenCalledTimes(1)
+    expect(scrolled.mock.calls[0][0]).toMatchObject({ block: 'start' })
+    expect(document.activeElement).toBe(w.find('form.dish-form input').element)
+    await editOf(1).trigger('click')
+    await flushPromises()
+    expect(scrolled).toHaveBeenCalledTimes(2)
+    w.unmount()
+    delete Element.prototype.scrollIntoView
+  })
+
+  it('表单开着时再点同一道菜的“改”：也滚回去，填了一半的内容留着（Codex 第 45 轮）', async () => {
+    backend({})
+    const scrolled = vi.fn()
+    Element.prototype.scrollIntoView = scrolled
+    const w = mount(DishesView, { props: { menu: MENU }, attachTo: document.body })
+    const editFirst = () => w.findAll('.dish-row')[0].findAll('button').find((b) => b.text() === '改').trigger('click')
+    await editFirst()
+    await flushPromises()
+    await w.find('form.dish-form input').setValue('改了一半的名字')
+    await editFirst()
+    await flushPromises()
+    expect(scrolled).toHaveBeenCalledTimes(2)
+    expect(w.find('form.dish-form input').element.value).toBe('改了一半的名字')
+    w.unmount()
+    delete Element.prototype.scrollIntoView
+  })
+
+  it('审核页“改了再通过”、账号页“改”也会滚过去，同一道再点也滚', async () => {
+    const scrolled = vi.fn()
+    Element.prototype.scrollIntoView = scrolled
+    backend({
+      '/api/admin/reviews': () => ({ reviews: [{ ...dish('u_a', '妈妈的红烧肉'), author: '小明', submittedAt: Date.now(), duplicate: false, revision: 1 }] }),
+    })
+    const reviews = mount(ReviewsView, { props: { menu: MENU }, attachTo: document.body })
+    await flushPromises()
+    const editReview = () => reviews.find('.review-row').findAll('button').find((b) => b.text() === '改了再通过').trigger('click')
+    await editReview()
+    await flushPromises()
+    await editReview()
+    await flushPromises()
+    expect(scrolled).toHaveBeenCalledTimes(2)
+    reviews.unmount()
+
+    const { default: MyDishesView } = await import('../src/account/MyDishesView.vue')
+    backend({
+      '/api/my/dishes': () => ({ canEdit: true, reason: null, dishes: [{ ...dish('u_m', '我的菜'), status: 'private', reviewNote: null }], approved: [] }),
+      '/api/my/menu': () => ({ version: 2, meals: MEALS, items: [] }),
+    })
+    const mine = mount(MyDishesView, { attachTo: document.body })
+    await flushPromises()
+    const editMine = () => mine.find('.dish-row').findAll('button').find((b) => b.text() === '改').trigger('click')
+    await editMine()
+    await flushPromises()
+    await editMine()
+    await flushPromises()
+    expect(scrolled).toHaveBeenCalledTimes(4)
+    mine.unmount()
+    delete Element.prototype.scrollIntoView
+  })
+
+  it('菜单列表里有图片的菜标“有图”（跟在“某某 提交”后面），没图的不标', async () => {
+    backend({})
+    const menu = { meals: MEALS, dishes: [dish('g1', '麻辣烫'), dish('u_s', '红烧肉', { scope: 'shared', author: '小明', image: `up_${'a'.repeat(32)}.webp` })] }
+    const w = mount(DishesView, { props: { menu } })
+    const rows = w.findAll('.dish-row')
+    expect(rows[0].text()).not.toContain('有图')
+    expect(rows[1].findAll('.badge').map((b) => b.text())).toEqual(['共享 · 小明 提交', '有图'])
+  })
+})

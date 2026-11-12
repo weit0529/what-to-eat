@@ -308,3 +308,8 @@ button:disabled {
   font-size: var(--fs-sm);
   overflow-wrap: anywhere;
 }
+
+/* 点“改”自动滚到表单时，上面留一点空，不贴着屏幕边（R-032） */
+.dish-form {
+  scroll-margin-top: 12px;
+}
