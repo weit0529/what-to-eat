@@ -1,14 +1,16 @@
 // 总菜单的接口（阶段 4-2，REQUIREMENTS.md R-020、R-021、R-027）。
 //
 // 公开（不用登录）：
-//   GET  /api/menu                 网站用的菜单：{ version, meals, items }，格式和 src/generated/menu.json 一样，只含启用的通用菜
+//   GET  /api/menu                 网站用的菜单：{ version, meals, items, thursdayPick }，格式和 src/generated/menu.json 一样，只含启用的通用菜
 //                                  （阶段 4-4 起分通用菜单和共享菜；登录用户的菜单见 my-menu-api.js）
+//                                  thursdayPick：周四特典那道菜的编号，没有特典时是 null（R-033，见下面 thursdayState）
 // 管理员（要登录、role = admin；权限在这里检查，不能只靠网页拦）：
 //   GET    /api/admin/menu         全部菜（含停用的）和额外餐次
 //   POST   /api/admin/dishes       新加一道菜
 //   PUT    /api/admin/dishes/:id   改一道菜
 //   DELETE /api/admin/dishes/:id   删一道菜
 //   PUT    /api/admin/meals        改额外餐次 { labels: [...] }
+//   PUT    /api/admin/thursday     周四特典开关 { on }（R-033；开关现在的样子在 GET /api/admin/menu 的 thursday 里）
 //   POST   /api/admin/import       用 Excel 导入的内容整个替换菜单 { mealLabels, dishes }
 //   GET    /api/admin/admins       管理员名单
 //   POST   /api/admin/admins       加一个管理员 { username, email, password }
@@ -167,6 +169,29 @@ async function mealsInUse(env, keepIds, scopes) {
 /** 至少留一道启用的通用菜（只算通用菜单：没登录的人只看得到它） */
 const KEEP_ONE_GENERAL = `(SELECT COUNT(*) FROM dishes WHERE enabled = 1 AND scope = 'general') > 1`
 
+/**
+ * 周四特典（R-033，用户 2026-11-18 选 1B、5B）：每周四第一次随机抽一定抽到菜单里叫“KFC”的那道菜（哪天、第几次由网页判断）。
+ * 这道菜是管理员在通用菜单里加的普通菜：名字是“KFC”（不分大小写）或“肯德基”，要启用；有几道时取排在最前面的。
+ * 开关存在 settings 的 thursday_kfc 里，没设置过就是开着。
+ * 返回 { on: 开关开没开, dishId: 找到的菜的编号（没有是 null） }
+ */
+export async function thursdayState(env) {
+  const [setting, dish] = await env.DB.batch([
+    env.DB.prepare("SELECT value FROM settings WHERE key = 'thursday_kfc'"),
+    env.DB.prepare(
+      `SELECT id FROM dishes WHERE enabled = 1 AND scope = 'general' AND (lower(trim(name)) = 'kfc' OR trim(name) = '肯德基')
+       ORDER BY sort, created_at LIMIT 1`,
+    ),
+  ])
+  return { on: setting.results[0]?.value !== '0', dishId: dish.results[0]?.id ?? null }
+}
+
+/** 网站菜单里的 thursdayPick：开关开着、又找到了这道菜时是它的编号，否则 null */
+export async function thursdayPick(env) {
+  const { on, dishId } = await thursdayState(env)
+  return on ? dishId : null
+}
+
 export const dishParams = (dish) => [
   dish.name,
   dish.shop ?? '',
@@ -190,7 +215,7 @@ export async function menuRoute(method, path, request, env, getAuth, now, starte
     const extra = await extraMeals(env)
     // 公开菜单只有通用菜单（共享菜只给登录用户，见 my-menu-api.js 的 /api/my/menu）
     const { results } = await env.DB.prepare(`${SELECT_DISH} WHERE enabled = 1 AND scope = 'general' ORDER BY sort, created_at`).all()
-    return reply({ version: MENU_FORMAT_VERSION, meals: allMeals(extra), items: results.map(rowToItem) })
+    return reply({ version: MENU_FORMAT_VERSION, meals: allMeals(extra), items: results.map(rowToItem), thursdayPick: await thursdayPick(env) })
   }
 
   if (!path.startsWith('/api/admin/')) return null
@@ -214,7 +239,20 @@ export async function menuRoute(method, path, request, env, getAuth, now, starte
     const extra = await extraMeals(env)
     const { results } = await env.DB.prepare(`${SELECT_DISH} ORDER BY sort, created_at`).all()
     const authors = await authorNames(env, results.map((row) => row.author_id))
-    return reply({ meals: allMeals(extra), dishes: results.map((row) => rowToAdminDish(row, authors)) })
+    return reply({ meals: allMeals(extra), dishes: results.map((row) => rowToAdminDish(row, authors)), thursday: await thursdayState(env) })
+  }
+
+  if (method === 'PUT' && path === '/api/admin/thursday') {
+    const body = await readJson(request, BODY_LIMIT)
+    if (body === TOO_LARGE) return reply({ error: '请求太大' }, 413)
+    if (typeof body?.on !== 'boolean') return reply({ error: '格式不对' }, 400)
+    await env.DB.prepare(
+      `INSERT INTO settings (key, value, updated_at, updated_by) VALUES ('thursday_kfc', ?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
+    )
+      .bind(body.on ? '1' : '0', now, who.user.id)
+      .run()
+    return reply({ thursday: await thursdayState(env) })
   }
 
   if (method === 'POST' && path === '/api/admin/dishes') {

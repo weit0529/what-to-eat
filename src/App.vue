@@ -11,6 +11,7 @@
   凭证失效（401）就清掉凭证、改取通用菜单；连不上照样用内置菜单。取到内部菜单后，菜单上方可切换“全部 / 只看我加的”。
   “最近吃过”（阶段 4-5，R-025）：登录着就用账号里的记录（src/ui/eaten-account.js），打开页面时同步一次；
   凭证失效（取菜单或同步记录时发现）就改回本机记录。账号编号登录时记下；以前登录的没记，就从内部菜单的回应里拿。
+  周四特典（R-033）：菜单里的 thursdayPick 指向那道菜；从完整菜单里找（“只看我加的”时也照样能抽到），交给抽取页。
 -->
 <script setup>
 import { computed, onMounted, ref, shallowRef, watch } from 'vue'
@@ -103,7 +104,8 @@ function forgetToken() {
 }
 
 /** 两份菜单内容是否一样（餐次和菜都一样） */
-const sameMenu = (a, b) => JSON.stringify([a.meals, a.items]) === JSON.stringify([b.meals, b.items])
+const sameMenu = (a, b) =>
+  JSON.stringify([a.meals, a.items, a.thursdayPick ?? null]) === JSON.stringify([b.meals, b.items, b.thursdayPick ?? null])
 
 function applyMenu(next) {
   menu.value = next
@@ -119,6 +121,11 @@ watch(mineCount, (count) => {
   if (count === 0) mineOnly.value = false
 })
 const shownItems = computed(() => (isMyMenu.value && mineOnly.value ? menu.value.items.filter((item) => item.mine) : menu.value.items))
+/** 周四特典那道菜（R-033）：后台没给、或者菜单里找不到时是 null */
+const thursdayDish = computed(() => {
+  const id = menu.value.thursdayPick
+  return (id && menu.value.items.find((item) => item.id === id)) || null
+})
 
 /** 取通用菜单（没登录、或登录失效后用） */
 async function loadGeneralMenu() {
@@ -187,7 +194,13 @@ onMounted(async () => {
           只看我加的（{{ mineCount }}）
         </button>
       </div>
-      <DrawPage :key="pageKey" :items="shownItems" :meals="menu.meals" :eaten-store="eatenStore" />
+      <DrawPage
+        :key="pageKey"
+        :items="shownItems"
+        :meals="menu.meals"
+        :eaten-store="eatenStore"
+        :thursday-dish="thursdayDish"
+      />
     </main>
 
     <p v-if="pending" class="menu-update" role="status">

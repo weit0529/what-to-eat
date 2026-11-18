@@ -2,6 +2,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import App from '../src/App.vue'
+import DrawPage from '../src/components/DrawPage.vue'
 import builtInMenu from '../src/generated/menu.json'
 import { fetchMenu, isValidMenu } from '../src/core/remote-menu.js'
 
@@ -27,7 +28,13 @@ describe('isValidMenu', () => {
 describe('fetchMenu', () => {
   it('取到就返回菜单（去掉 serverMs 等多余的字段）', async () => {
     const { menu } = await fetchMenu('https://api/api/menu', { fetchImpl: respond({ ...remote, serverMs: 3 }) })
-    expect(menu).toEqual(remote)
+    expect(menu).toEqual({ ...remote, thursdayPick: null })
+  })
+
+  it('带上周四特典那道菜的编号（R-033）；不是字符串就当没有', async () => {
+    const id = remote.items[0].id
+    expect((await fetchMenu('u', { fetchImpl: respond({ ...remote, thursdayPick: id }) })).menu.thursdayPick).toBe(id)
+    expect((await fetchMenu('u', { fetchImpl: respond({ ...remote, thursdayPick: 3 }) })).menu.thursdayPick).toBeNull()
   })
 
   it('HTTP 出错、格式不对、连不上、太慢，都返回 null 和原因，不抛错', async () => {
@@ -96,6 +103,26 @@ describe('最新菜单什么时候换上（Codex 第 28 轮）', () => {
     expect(w.find('.menu-update').exists()).toBe(false)
     expect(w.find('.meal.selected').exists()).toBe(false)
     w.unmount()
+  })
+
+  it('只有周四特典变了也算菜单更新；特典菜从完整菜单里找出来交给抽取页（R-033）', async () => {
+    const first = { ...remote, thursdayPick: null }
+    const w = mount(App, { props: { fetchImpl: respond(first) } })
+    await flushPromises()
+    expect(w.findComponent(DrawPage).props('thursdayDish')).toBeNull()
+    w.unmount()
+
+    const picked = { ...remote, thursdayPick: remote.items[1].id }
+    const w2 = mount(App, { props: { fetchImpl: respond(picked) } })
+    await flushPromises()
+    expect(w2.findComponent(DrawPage).props('thursdayDish')).toEqual(remote.items[1])
+    w2.unmount()
+
+    const missing = { ...remote, thursdayPick: 'not-in-menu' }
+    const w3 = mount(App, { props: { fetchImpl: respond(missing) } })
+    await flushPromises()
+    expect(w3.findComponent(DrawPage).props('thursdayDish')).toBeNull()
+    w3.unmount()
   })
 
   it('用户还没点过页面：直接换上', async () => {

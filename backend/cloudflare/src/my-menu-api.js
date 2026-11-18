@@ -4,7 +4,7 @@
 // 我的菜（user_dishes，只有自己）。审核通过时菜从 user_dishes 搬进 dishes，编号不变。
 //
 // 登录用户：
-//   GET    /api/my/menu                   内部菜单 = 通用 + 共享 + 我的，格式和 /api/menu 一样，每道菜多一个 mine（是不是我加的）
+//   GET    /api/my/menu                   内部菜单 = 通用 + 共享 + 我的，格式和 /api/menu 一样（含 thursdayPick），每道菜多一个 mine（是不是我加的）
 //   GET    /api/my/dishes                 我的菜（含审核状态、退回理由）、我提交且已通过的共享菜、我现在能不能加改菜
 //   POST   /api/my/dishes                 加一道菜（马上能用，只有自己看得到）
 //   PUT    /api/my/dishes/:id             改（审核中的不能改）
@@ -25,7 +25,7 @@
 import { isUploadedImage, validateDish } from '../../../src/core/menu-data.js'
 import { randomHex } from './auth.js'
 import { json, readJson, TOO_LARGE } from './http.js'
-import { allMeals, checkDish, dishParams, extraMeals, mealIdsOf, MEALS_EXIST, requireAdmin, rowToItem, SELECT_DISH } from './menu-api.js'
+import { allMeals, checkDish, dishParams, extraMeals, mealIdsOf, MEALS_EXIST, requireAdmin, rowToItem, SELECT_DISH, thursdayPick } from './menu-api.js'
 import { dishEditLimits, takeQuotas } from './send-limits.js'
 
 const MENU_FORMAT_VERSION = 2
@@ -143,7 +143,7 @@ async function myRoute(method, path, request, env, auth, now, reply) {
       ...mine.map(userRowToItem),
     ]
     // userId：网页用它把“吃过”记录的本机副本按账号分开存（阶段 4-5）
-    return reply({ version: MENU_FORMAT_VERSION, meals: allMeals(extra), items, userId: user.id })
+    return reply({ version: MENU_FORMAT_VERSION, meals: allMeals(extra), items, userId: user.id, thursdayPick: await thursdayPick(env) })
   }
 
   if (method === 'GET' && path === '/api/my/dishes') {

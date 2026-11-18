@@ -104,6 +104,28 @@ async function reject(admin, id, note) {
   return call('POST', `/api/admin/reviews/${id}/reject`, { body: { revision: await revisionOf(admin, id), note }, token: admin })
 }
 
+describe('周四特典（R-033）', () => {
+  it('内部菜单也带 thursdayPick；只认通用菜，用户自己加的、共享菜叫 KFC 都不算', async () => {
+    const { admin, ming } = await setup()
+    const KFC = { name: 'KFC', category: '西式快餐', meals: ['lunch'], tags: [] }
+    const mine = (await call('POST', '/api/my/dishes', { body: KFC, token: ming.token })).data.dish
+    expect((await call('GET', '/api/my/menu', { token: ming.token })).data.thursdayPick).toBeNull()
+
+    await call('POST', `/api/my/dishes/${mine.id}/submit`, { body: {}, token: ming.token })
+    expect((await approve(admin, mine.id)).status).toBe(200)
+    expect((await call('GET', '/api/my/menu', { token: ming.token })).data.thursdayPick).toBeNull()
+
+    await call('POST', `/api/admin/dishes/${mine.id}/promote`, { body: {}, token: admin })
+    expect((await call('GET', '/api/my/menu', { token: ming.token })).data.thursdayPick).toBe(mine.id)
+    expect((await call('GET', '/api/menu')).data.thursdayPick).toBe(mine.id)
+  })
+
+  it('普通用户不能改周四特典开关', async () => {
+    const { ming } = await setup()
+    expect((await call('PUT', '/api/admin/thursday', { body: { on: false }, token: ming.token })).status).toBe(403)
+  })
+})
+
 describe('三层菜单：我的菜只有自己看得到', () => {
   it('没登录只看通用菜单；登录后的内部菜单 = 通用 + 我的，别人的菜看不到', async () => {
     const { general, ming, hong } = await setup()

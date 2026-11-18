@@ -289,6 +289,54 @@ describe('管理员名单', () => {
   })
 })
 
+describe('周四特典（R-033）', () => {
+  const KFC = { name: 'KFC', shop: '', category: '西式快餐', meals: ['lunch', 'dinner'], tags: [], price: 40 }
+
+  it('没有叫 KFC 的菜时 thursdayPick 是 null；加了（不分大小写、或叫“肯德基”）就是它；停用了又是 null', async () => {
+    const token = await adminToken()
+    await call('POST', '/api/admin/dishes', { body: DISH, token })
+    expect((await call('GET', '/api/menu')).data.thursdayPick).toBeNull()
+    expect((await call('GET', '/api/admin/menu', { token })).data.thursday).toEqual({ on: true, dishId: null })
+
+    const kfc = (await call('POST', '/api/admin/dishes', { body: { ...KFC, name: 'kfc' }, token })).data.dish
+    expect((await call('GET', '/api/menu')).data.thursdayPick).toBe(kfc.id)
+    expect((await call('GET', '/api/admin/menu', { token })).data.thursday).toEqual({ on: true, dishId: kfc.id })
+
+    await call('PUT', `/api/admin/dishes/${kfc.id}`, { body: { ...KFC, name: 'kfc', enabled: false }, token })
+    expect((await call('GET', '/api/menu')).data.thursdayPick).toBeNull()
+
+    const cn = (await call('POST', '/api/admin/dishes', { body: { ...KFC, name: '肯德基' }, token })).data.dish
+    expect((await call('GET', '/api/menu')).data.thursdayPick).toBe(cn.id)
+  })
+
+  it('有几道时取排在前面的', async () => {
+    const token = await adminToken()
+    const first = (await call('POST', '/api/admin/dishes', { body: { ...KFC, shop: '万达店' }, token })).data.dish
+    await call('POST', '/api/admin/dishes', { body: { ...KFC, shop: '火车站店' }, token })
+    expect((await call('GET', '/api/menu')).data.thursdayPick).toBe(first.id)
+  })
+
+  it('管理员关掉开关后网站上就没有特典，再打开又有；管理页照样看得到找到的菜', async () => {
+    const token = await adminToken()
+    const kfc = (await call('POST', '/api/admin/dishes', { body: KFC, token })).data.dish
+    const off = await call('PUT', '/api/admin/thursday', { body: { on: false }, token })
+    expect(off.status).toBe(200)
+    expect(off.data.thursday).toEqual({ on: false, dishId: kfc.id })
+    expect((await call('GET', '/api/menu')).data.thursdayPick).toBeNull()
+    expect((await call('GET', '/api/admin/menu', { token })).data.thursday).toEqual({ on: false, dishId: kfc.id })
+
+    await call('PUT', '/api/admin/thursday', { body: { on: true }, token })
+    expect((await call('GET', '/api/menu')).data.thursdayPick).toBe(kfc.id)
+  })
+
+  it('开关只有管理员能改，格式不对拒绝', async () => {
+    const token = await adminToken()
+    expect((await call('PUT', '/api/admin/thursday', { body: { on: false } })).status).toBe(401)
+    expect((await call('PUT', '/api/admin/thursday', { body: { on: 'no' }, token })).status).toBe(400)
+    expect((await call('PUT', '/api/admin/thursday', { body: {}, token })).status).toBe(400)
+  })
+})
+
 describe('跨域和请求大小', () => {
   it('预检请求允许 PUT、DELETE 和 authorization 头', async () => {
     const res = await call('OPTIONS', '/api/admin/dishes/x')

@@ -1,7 +1,8 @@
 <!--
   抽中结果的卡片：图片（没有图片时显示分类图标）、名字、店铺、分类、人均价格、标签、描述。
   卡片下面的按钮（“就吃这个”等）由使用方放进默认插槽。
-  用法：<ResultCard :item="抽中的菜"> …按钮… </ResultCard>
+  badge：名字上方的小标签（如周四特典，R-033），不传就没有。
+  用法：<ResultCard :item="抽中的菜" badge="周四特典"> …按钮… </ResultCard>
 -->
 <script setup>
 import { computed, ref, watch } from 'vue'
@@ -11,6 +12,7 @@ import { imageUrlOf } from '../ui/image-url.js'
 
 const props = defineProps({
   item: { type: Object, required: true },
+  badge: { type: String, default: '' },
 })
 
 /** 图片加载失败（比如文件坏了）时就不显示图片，改显示分类图标 */
@@ -48,6 +50,7 @@ const priceText = computed(() => {
       <component :is="categoryIcon" :size="40" :stroke-width="1.5" />
     </div>
     <div class="body">
+      <p v-if="badge" class="badge">{{ badge }}</p>
       <p class="category">{{ item.category }}</p>
       <h2 class="name">{{ item.name }}</h2>
       <p v-if="item.shop || priceText" class="meta">
@@ -95,6 +98,17 @@ const priceText = computed(() => {
 .body {
   padding: 12px 16px 20px;
   text-align: center;
+}
+
+.badge {
+  display: inline-block;
+  margin: 0 0 6px;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: var(--fs-sm);
+  font-weight: 700;
 }
 
 .category {

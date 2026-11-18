@@ -4,6 +4,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import ReviewsView from '../src/admin/ReviewsView.vue'
 import AccessView from '../src/admin/AccessView.vue'
 import DishesView from '../src/admin/DishesView.vue'
+import ThursdayCard from '../src/admin/ThursdayCard.vue'
 
 const menuToSheets = vi.hoisted(() => vi.fn(() => []))
 vi.mock('../src/core/menu-excel.js', async (importOriginal) => ({ ...(await importOriginal()), menuToSheets }))
@@ -189,6 +190,32 @@ describe('加菜权限', () => {
       ['PUT', '/api/admin/dish-access/c', { list: 'black' }],
       ['PUT', '/api/admin/dish-access/a', { list: null }],
     ])
+  })
+})
+
+describe('周四特典开关（R-033）', () => {
+  it('显示找到的菜；点开关发请求并通知外面重新读菜单', async () => {
+    const calls = backend({ 'PUT /api/admin/thursday': () => json({ thursday: { on: false, dishId: 'k' } }) })
+    const menu = { ...MENU, dishes: [...MENU.dishes, dish('k', 'KFC', { shop: '万达店' })], thursday: { on: true, dishId: 'k' } }
+    const w = mount(ThursdayCard, { props: { menu } })
+    expect(w.find('.switch-line input').element.checked).toBe(true)
+    expect(w.text()).toContain('“KFC”（万达店）')
+    expect(w.find('.error').exists()).toBe(false)
+    await w.find('.switch-line input').trigger('click')
+    await flushPromises()
+    expect(calls).toEqual([['PUT', '/api/admin/thursday', { on: false }]])
+    expect(w.emitted('changed')).toHaveLength(1)
+  })
+
+  it('开着但菜单里没有 KFC：提醒去加；关着时说现在关着', async () => {
+    backend({})
+    let w = mount(ThursdayCard, { props: { menu: { ...MENU, thursday: { on: true, dishId: null } } } })
+    expect(w.find('.error').text()).toContain('还没有叫“KFC”')
+    w.unmount()
+    w = mount(ThursdayCard, { props: { menu: { ...MENU, thursday: { on: false, dishId: null } } } })
+    expect(w.find('.switch-line input').element.checked).toBe(false)
+    expect(w.text()).toContain('现在关着')
+    expect(w.find('.error').exists()).toBe(false)
   })
 })
 

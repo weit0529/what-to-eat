@@ -1,6 +1,6 @@
 <!--
   管理页（阶段 4-2，网址 /admin/，正式网站上没有入口链接，用户 2026-11-10 选 3A）。
-  先登录（只有管理员能用），然后分几块：菜单、审核和加菜权限（4-4）、餐次、Excel 导入导出、邀请码（4-3）、管理员、改密码。
+  先登录（只有管理员能用），然后分几块：菜单（顶上有图片存储用量、周四特典开关）、审核和加菜权限（4-4）、餐次、Excel 导入导出、邀请码（4-3）、管理员、改密码。
   菜单数据在这里读一次，各块改完后通知这里重新读。
 -->
 <script setup>
@@ -15,6 +15,7 @@ import InvitesView from './InvitesView.vue'
 import ReviewsView from './ReviewsView.vue'
 import AccessView from './AccessView.vue'
 import StorageBar from './StorageBar.vue'
+import ThursdayCard from './ThursdayCard.vue'
 
 const reviewCount = ref(0)
 const TABS = computed(() => [
@@ -122,6 +123,7 @@ onMounted(async () => {
       <template v-if="menu">
         <template v-if="tab === 'dishes'">
           <StorageBar />
+          <ThursdayCard :menu="menu" @changed="loadMenu" />
           <DishesView :menu="menu" @changed="loadMenu" />
         </template>
         <ReviewsView v-else-if="tab === 'reviews'" :menu="menu" @changed="onReviewed" />

@@ -29,7 +29,7 @@ export function isValidMenu(data) {
 }
 
 /**
- * 从后台取菜单。成功返回 { menu }，失败返回 { menu: null, reason, status }，不会抛错。
+ * 从后台取菜单。成功返回 { menu }（menu 里有 thursdayPick，见下面），失败返回 { menu: null, reason, status }，不会抛错。
  * @param {string} url  后台的 /api/menu 地址；登录用户用 /api/my/menu（阶段 4-4）
  * @param {{ token?: string }} opts  登录凭证（读登录用户的内部菜单时带上）
  */
@@ -43,7 +43,9 @@ export async function fetchMenu(url, { fetchImpl = fetch, timeoutMs = 8000, toke
     if (!isValidMenu(data)) return { menu: null, reason: '后台返回的菜单格式不对，或者一道菜都没有' }
     // userId：登录用户的内部菜单会带上（阶段 4-5，首页按它分开存“吃过”记录）
     const userId = typeof data.userId === 'string' ? data.userId : ''
-    return { menu: { version: data.version, meals: data.meals, items: data.items }, reason: '', userId }
+    // thursdayPick：周四特典那道菜的编号（R-033）；没有特典、或者老后台没这一项时是 null
+    const thursdayPick = typeof data.thursdayPick === 'string' ? data.thursdayPick : null
+    return { menu: { version: data.version, meals: data.meals, items: data.items, thursdayPick }, reason: '', userId }
   } catch (err) {
     return { menu: null, reason: `连不上后台（${err?.message || err}）` }
   }

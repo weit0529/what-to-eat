@@ -44,3 +44,5 @@ export const setUserList = (userId, list, opts) =>
 export const uploadImage = (blob, opts) => request('/api/images', { method: 'POST', body: blob, ...opts }).then((r) => r.data.image)
 /** 图片存储用了多少（R2 免费 10 GB），管理页进度条用 */
 export const getStorage = (opts) => request('/api/admin/storage', opts).then((r) => r.data)
+// 周四特典开关（R-033）
+export const setThursday = (on, opts) => request('/api/admin/thursday', { method: 'PUT', body: { on }, ...opts }).then((r) => r.data.thursday)
